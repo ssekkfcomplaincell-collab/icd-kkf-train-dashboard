@@ -113,6 +113,7 @@ export default function TrainDashboard() {
   const { date: todayDate, day: todayDay } = todayInfo();
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const todaysInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW" || i.status === "DEPARTS TODAY"), [allInstances]);
+  const mapInstances = useMemo(() => todaysInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent })), [todaysInstances]);
   const baseTrains = todayOnly ? trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0) : trains;
 
   const filteredTrains = useMemo(() => {
@@ -159,7 +160,7 @@ export default function TrainDashboard() {
 
     <section className="panel map-panel taptrack-shell"><div className="map-topbar"><div><div className="panel-kicker">ICD / KKF • LIVE OPERATIONS MAP</div><h2>Running trains • {todayDay}, {todayDate}</h2></div><div className="map-status"><b><span className="map-live-dot" /> {todaysInstances.length} trains running</b><span>{todaysInstances.length} service instances • schedule based</span></div></div>
       <div className="taptrack-map-stage">
-        {todaysInstances.length ? <RouteMap instances={todaysInstances} selectedKey={selectedInstance?.key || ""} onTrainClick={(key) => setSelectedKey(key)} /> : <div className="real-map map-loading">No active train instances for today.</div>}
+        {todaysInstances.length ? <RouteMap instances={mapInstances} selectedKey={selectedInstance?.key || ""} onTrainClick={(key) => setSelectedKey(key)} /> : <div className="real-map map-loading">No active train instances for today.</div>}
         <aside className="map-left-drawer">
           <div className="map-brand"><div className="brand-mark">🚆</div><div><b>TapTrack Style</b><span>ICD / KKF</span></div><button onClick={() => setTodayOnly(true)}>Today</button></div>
           <div className="map-search-wrap"><input className="map-search" placeholder="Search train / station…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>

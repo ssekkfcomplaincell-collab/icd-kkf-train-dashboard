@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useMemo } from "react";
-import { CircleMarker, DivIcon, MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
+import { DivIcon } from "leaflet";
 import { StationRow } from "@/lib/types";
 
 export type MapTrainInstance = {

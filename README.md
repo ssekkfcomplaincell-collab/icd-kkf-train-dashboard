@@ -45,3 +45,6 @@ The schedule source is already configured in `lib/google-sheet.ts`. No environme
 ## Important limitation
 
 The map shows **scheduled geographic progress**, not GPS/live train location. A real GPS position would require a live train-running source.
+
+
+V8 build fix: train map labels use Leaflet DivIcon from the leaflet package rather than react-leaflet.

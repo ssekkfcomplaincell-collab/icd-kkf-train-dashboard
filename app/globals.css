@@ -110,3 +110,18 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .taptrack-legend { left:50%; transform:translateX(-50%); bottom:12px; }
 @media (max-width:900px) { .taptrack-map-stage { height:620px; } .map-left-drawer { width:250px; } .map-right-drawer { width:330px; } }
 @media (max-width:700px) { .taptrack-map-stage { height:720px; } .map-left-drawer { top:10px; left:10px; right:10px; width:auto; max-height:250px; } .map-train-list { display:grid; grid-template-columns:1fr 1fr; } .map-right-drawer { top:270px; left:10px; right:10px; bottom:10px; width:auto; max-width:none; } .taptrack-legend { display:none; } }
+
+
+/* Watering point alerts: shown on the map when a train is within 20 minutes of watering */
+.watering-alert-stack { position:absolute; z-index:1200; top:14px; right:405px; width:300px; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+.watering-alert { pointer-events:auto; display:flex; align-items:center; gap:9px; width:100%; border:1px solid #b9dfce; border-left:4px solid #16a36f; background:rgba(255,255,255,.98); border-radius:11px; padding:9px 10px; box-shadow:0 10px 28px rgba(15,23,42,.18); text-align:left; cursor:pointer; animation:wateringPulse 1.8s ease-in-out infinite; }
+.watering-alert:hover { transform:translateY(-1px); }
+.watering-alert-icon { width:28px; height:28px; display:grid; place-items:center; border-radius:8px; background:#e8f8f1; font-size:15px; flex:0 0 auto; }
+.watering-alert-body { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.watering-alert-body b { color:#0d8158; font-size:8px; letter-spacing:.06em; }
+.watering-alert-body strong { color:#26384a; font-size:11px; }
+.watering-alert-body small { color:#6f7f8f; font-size:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.watering-alert-arrow { margin-left:auto; color:#16a36f; font-size:22px; line-height:1; }
+@keyframes wateringPulse { 0%,100% { box-shadow:0 10px 28px rgba(15,23,42,.18); } 50% { box-shadow:0 10px 28px rgba(22,163,111,.28), 0 0 0 3px rgba(22,163,111,.08); } }
+@media (max-width:1100px) { .watering-alert-stack { right:14px; top:300px; width:285px; } }
+@media (max-width:700px) { .watering-alert-stack { left:10px; right:10px; top:255px; width:auto; } }

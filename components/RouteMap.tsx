@@ -11,6 +11,7 @@ export type MapTrainInstance = {
   stations: StationRow[];
   departureDate: Date;
   percent: number;
+  currentStationName: string;
 };
 
 function isExcludedStation(station: StationRow) {
@@ -119,12 +120,21 @@ export default function RouteMap({
       {routes.map((route) => <Fragment key={route.instance.key}>
         {route.solid.map((line, i) => <Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: route.instance.key === selectedKey ? 6 : 4, opacity: route.instance.key === selectedKey ? 0.95 : 0.58 }} />)}
         {route.dotted.map((line, i) => <Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: route.instance.key === selectedKey ? 5 : 3, opacity: route.instance.key === selectedKey ? 0.75 : 0.4, dashArray: "7 9" }} />)}
-        {route.points.length > 0 && <Marker
-          position={route.current || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))]}
-          icon={labelIcon(route.instance.trainNo, route.color, route.instance.key === selectedKey)}
-          eventHandlers={{ click: () => onTrainClick(route.instance.key) }}
-          zIndexOffset={route.instance.key === selectedKey ? 1000 : 200}
-        />}
+        {route.points.length > 0 && (() => {
+          const routeStations = route.instance.stations
+            .filter((s) => !isExcludedStation(s))
+            .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
+          const currentStation = routeStations.find((s) => s.stationName === route.instance.currentStationName);
+          const markerPosition = currentStation
+            ? [currentStation.latitude as number, currentStation.longitude as number] as [number, number]
+            : route.current || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))];
+          return <Marker
+            position={markerPosition}
+            icon={labelIcon(route.instance.trainNo, route.color, route.instance.key === selectedKey)}
+            eventHandlers={{ click: () => onTrainClick(route.instance.key) }}
+            zIndexOffset={route.instance.key === selectedKey ? 1000 : 200}
+          />;
+        })()}
         {route.points.map((point, i) => <CircleMarker key={`p-${route.instance.key}-${i}`} center={point} radius={route.instance.key === selectedKey ? 4 : 3} pathOptions={{ color: route.color, weight: 1, fillOpacity: .85 }} eventHandlers={{ click: () => onTrainClick(route.instance.key) }} />)}
       </Fragment>)}
     </MapContainer>

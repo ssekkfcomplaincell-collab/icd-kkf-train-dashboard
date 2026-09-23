@@ -113,7 +113,7 @@ export default function TrainDashboard() {
   const { date: todayDate, day: todayDay } = todayInfo();
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const todaysInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW" || i.status === "DEPARTS TODAY"), [allInstances]);
-  const mapInstances = useMemo(() => todaysInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent })), [todaysInstances]);
+  const mapInstances = useMemo(() => todaysInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent, currentStationName: inst.currentStation })), [todaysInstances]);
   const baseTrains = todayOnly ? trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0) : trains;
 
   const filteredTrains = useMemo(() => {
@@ -145,6 +145,23 @@ export default function TrainDashboard() {
   const mappedCount = valid.filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)).length;
   const routeDay = selectedInstance ? Math.max(1, Math.min(99, Math.floor((atMidnight(now).getTime() - atMidnight(departureDate!).getTime()) / 86400000) + 1)) : null;
 
+  const wateringAlerts = useMemo(() => {
+    const alerts: { key: string; trainNo: string; station: StationRow; minutes: number; departureDate: Date }[] = [];
+    for (const inst of todaysInstances) {
+      for (let i = 0; i < validStations(inst.train.stations).length; i++) {
+        const station = validStations(inst.train.stations)[i];
+        if (!station.watering) continue;
+        const eventTime = rowDateTime(station, inst.departureDate, "arrival") || rowDateTime(station, inst.departureDate, "departure");
+        if (!eventTime) continue;
+        const diff = Math.round((eventTime.getTime() - now.getTime()) / 60000);
+        if (diff >= 0 && diff <= 20) {
+          alerts.push({ key: `${inst.key}-${station.stationCode}-${i}`, trainNo: inst.train.trainNo, station, minutes: diff, departureDate: inst.departureDate });
+        }
+      }
+    }
+    return alerts.sort((a, b) => a.minutes - b.minutes);
+  }, [todaysInstances, now]);
+
   return <main className="page">
     <header className="topbar"><div><div className="eyebrow">ICD / KKF • OPERATIONS CONTROL</div><h1>Train Operations Dashboard</h1><p className="sub">Live schedule • departure date • Day 1/2/3 • geographic route progress</p></div><div className="top-actions"><span className={`live-dot ${loading ? "pulse" : ""}`} /><span>{loading ? "Refreshing…" : "Sheet Connected"}</span><button className="refresh" onClick={load} disabled={loading}>↻ {loading ? "Loading" : "Refresh"}</button></div></header>
     {error && <div className="error"><strong>Data loading error:</strong> {error}<div>Schedule is loaded from the published Google Sheet. Coordinate sheet is optional; stations without valid coordinates are skipped on the map.</div></div>}
@@ -160,6 +177,13 @@ export default function TrainDashboard() {
 
     <section className="panel map-panel taptrack-shell"><div className="map-topbar"><div><div className="panel-kicker">ICD / KKF • LIVE OPERATIONS MAP</div><h2>Running trains • {todayDay}, {todayDate}</h2></div><div className="map-status"><b><span className="map-live-dot" /> {todaysInstances.length} trains running</b><span>{todaysInstances.length} service instances • schedule based</span></div></div>
       <div className="taptrack-map-stage">
+        {wateringAlerts.length > 0 && <div className="watering-alert-stack" aria-live="polite">
+          {wateringAlerts.map((alert) => <button key={alert.key} className="watering-alert" onClick={() => setSelectedKey(`${alert.trainNo}-${dateKey(alert.departureDate)}`)}>
+            <span className="watering-alert-icon">💧</span>
+            <span className="watering-alert-body"><b>WATERING POINT IN {alert.minutes} MIN</b><strong>{alert.trainNo} • {alert.station.stationCode}</strong><small>{alert.station.stationName} • {alert.station.watering}</small></span>
+            <span className="watering-alert-arrow">›</span>
+          </button>)}
+        </div>}
         {todaysInstances.length ? <RouteMap instances={mapInstances} selectedKey={selectedInstance?.key || ""} onTrainClick={(key) => setSelectedKey(key)} /> : <div className="real-map map-loading">No active train instances for today.</div>}
         <aside className="map-left-drawer">
           <div className="map-brand"><div className="brand-mark">🚆</div><div><b>TapTrack Style</b><span>ICD / KKF</span></div><button onClick={() => setTodayOnly(true)}>Today</button></div>

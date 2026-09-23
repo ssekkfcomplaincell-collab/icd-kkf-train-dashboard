@@ -107,6 +107,11 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .train-map-label { display:flex; align-items:center; gap:4px; width:max-content; min-width:45px; padding:4px 7px; border:1px solid rgba(255,255,255,.9); border-left:3px solid var(--train-color); border-radius:8px; background:#fff; box-shadow:0 5px 14px rgba(15,23,42,.18); transform:translate(-50%, -50%); font-size:9px; color:#253548; }
 .train-map-label.selected { box-shadow:0 0 0 2px rgba(23,105,170,.18),0 7px 18px rgba(15,23,42,.2); }
 .train-map-pulse { width:7px; height:7px; border-radius:50%; background:var(--train-color); }
+.train-hover-tooltip { border:0 !important; border-radius:10px !important; padding:0 !important; box-shadow:0 8px 24px rgba(15,23,42,.22) !important; }
+.train-hover-tooltip::before { display:none !important; }
+.train-hover-tooltip-content { display:flex; flex-direction:column; gap:4px; min-width:205px; padding:9px 11px; font-size:10px; color:#334155; }
+.train-hover-tooltip-content b { color:#1769aa; font-size:12px; margin-bottom:2px; }
+.train-hover-tooltip-content span { white-space:nowrap; }
 .taptrack-legend { left:50%; transform:translateX(-50%); bottom:12px; }
 @media (max-width:900px) { .taptrack-map-stage { height:620px; } .map-left-drawer { width:250px; } .map-right-drawer { width:330px; } }
 @media (max-width:700px) { .taptrack-map-stage { height:720px; } .map-left-drawer { top:10px; left:10px; right:10px; width:auto; max-height:250px; } .map-train-list { display:grid; grid-template-columns:1fr 1fr; } .map-right-drawer { top:270px; left:10px; right:10px; bottom:10px; width:auto; max-width:none; } .taptrack-legend { display:none; } }

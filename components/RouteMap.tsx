@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo } from "react";
-import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { DivIcon } from "leaflet";
 import { StationRow } from "@/lib/types";
 
@@ -54,6 +54,19 @@ function labelIcon(trainNo: string, color: string, selected: boolean) {
     iconSize: [82, 30],
     iconAnchor: [41, 15],
   });
+}
+
+function nextWateringStation(stations: StationRow[], currentStationName: string) {
+  const routeStations = stations.filter((s) => !isExcludedStation(s));
+  const currentIndex = routeStations.findIndex((s) =>
+    s.stationName.trim().toLowerCase() === currentStationName.trim().toLowerCase()
+  );
+  const startIndex = currentIndex >= 0 ? currentIndex + 1 : 0;
+  return routeStations.slice(startIndex).find((s) => s.watering?.trim()) || null;
+}
+
+function formatDepartureDate(date: Date) {
+  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 export default function RouteMap({
@@ -132,12 +145,25 @@ export default function RouteMap({
           const markerPosition = currentStation
             ? [currentStation.latitude as number, currentStation.longitude as number] as [number, number]
             : route.current || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))];
+          const nextWatering = nextWateringStation(route.instance.stations, route.instance.currentStationName);
+          const isSelected = route.instance.key === selectedKey;
+          const isVisible = !selectedKey || isSelected;
+          if (!isVisible) return null;
           return <Marker
             position={markerPosition}
-            icon={labelIcon(route.instance.trainNo, route.color, route.instance.key === selectedKey)}
+            icon={labelIcon(route.instance.trainNo, route.color, isSelected)}
             eventHandlers={{ click: () => onTrainClick(route.instance.key) }}
-            zIndexOffset={route.instance.key === selectedKey ? 1000 : 200}
-          />;
+            zIndexOffset={isSelected ? 1000 : 200}
+          >
+            <Tooltip direction="top" offset={[0, -16]} opacity={1} className="train-hover-tooltip">
+              <div className="train-hover-tooltip-content">
+                <b>Train {route.instance.trainNo}</b>
+                <span>Departure: {formatDepartureDate(route.instance.departureDate)}</span>
+                <span>Current: {route.instance.currentStationName}</span>
+                <span>Next Watering: {nextWatering ? `${nextWatering.stationName} • ${nextWatering.watering}` : "None"}</span>
+              </div>
+            </Tooltip>
+          </Marker>;
         })()}
         {route.instance.key === selectedKey && route.points.map((point, i) => <CircleMarker key={`p-${route.instance.key}-${i}`} center={point} radius={4} pathOptions={{ color: route.color, weight: 1, fillOpacity: .85 }} eventHandlers={{ click: () => onTrainClick(route.instance.key) }} />)}
       </Fragment>)}

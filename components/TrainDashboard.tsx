@@ -163,8 +163,11 @@ export default function TrainDashboard() {
         }
       }
     }
-    return alerts.sort((a, b) => a.minutes - b.minutes);
-  }, [runningNowInstances, now, wateringDismissed]);
+    const visibleAlerts = selectedKey
+      ? alerts.filter((alert) => alert.key.startsWith(`${selectedKey}-`))
+      : alerts;
+    return visibleAlerts.sort((a, b) => a.minutes - b.minutes);
+  }, [runningNowInstances, now, wateringDismissed, selectedKey]);
 
   useEffect(() => {
     setWateringCodes((current) => {

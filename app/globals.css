@@ -122,6 +122,15 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .watering-alert-body strong { color:#26384a; font-size:11px; }
 .watering-alert-body small { color:#6f7f8f; font-size:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .watering-alert-arrow { margin-left:auto; color:#16a36f; font-size:22px; line-height:1; }
+
+.watering-code-row { display:flex; align-items:center; gap:5px; margin-top:5px; }
+.watering-code-row > span { font-size:8px; color:#6f7f8f; white-space:nowrap; }
+.watering-code-row > span b { color:#0d8158; letter-spacing:.16em; font-size:10px; }
+.watering-code-row input { width:48px; height:24px; border:1px solid #cbd8d3; border-radius:6px; padding:0 6px; font-size:11px; font-weight:700; text-align:center; outline:none; }
+.watering-code-row input:focus { border-color:#16a36f; box-shadow:0 0 0 2px rgba(22,163,111,.1); }
+.watering-code-row button { width:25px; height:24px; border:0; border-radius:6px; background:#16a36f; color:white; font-weight:800; cursor:pointer; }
+.watering-code-row button:disabled { background:#cbd5d1; cursor:not-allowed; }
+
 @keyframes wateringPulse { 0%,100% { box-shadow:0 10px 28px rgba(15,23,42,.18); } 50% { box-shadow:0 10px 28px rgba(22,163,111,.28), 0 0 0 3px rgba(22,163,111,.08); } }
 @media (max-width:1100px) { .watering-alert-stack { right:14px; top:300px; width:285px; } }
 @media (max-width:700px) { .watering-alert-stack { left:10px; right:10px; top:255px; width:auto; } }

@@ -96,6 +96,9 @@ export default function TrainDashboard() {
   const [updatedAt, setUpdatedAt] = useState("");
   const [lastRefresh, setLastRefresh] = useState("");
   const [now, setNow] = useState(new Date());
+  const [wateringCodes, setWateringCodes] = useState<Record<string, string>>({});
+  const [wateringDismissed, setWateringDismissed] = useState<Record<string, boolean>>({});
+  const [wateringInputs, setWateringInputs] = useState<Record<string, string>>({});
 
   async function load() {
     try {
@@ -112,8 +115,9 @@ export default function TrainDashboard() {
 
   const { date: todayDate, day: todayDay } = todayInfo();
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
-  const todaysInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW" || i.status === "DEPARTS TODAY"), [allInstances]);
-  const mapInstances = useMemo(() => todaysInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent, currentStationName: inst.currentStation })), [todaysInstances]);
+  const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);
+  const todaysInstances = runningNowInstances;
+  const mapInstances = useMemo(() => runningNowInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent, currentStationName: inst.currentStation })), [todaysInstances]);
   const baseTrains = todayOnly ? trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0) : trains;
 
   const filteredTrains = useMemo(() => {
@@ -127,11 +131,10 @@ export default function TrainDashboard() {
   }, [baseTrains, search]);
 
   useEffect(() => {
-    if (!selectedKey && todaysInstances.length) setSelectedKey(todaysInstances[0].key);
-    else if (selectedKey && !allInstances.some((x) => x.key === selectedKey)) setSelectedKey(todaysInstances[0]?.key || "");
-  }, [selectedKey, allInstances, todaysInstances]);
+    if (selectedKey && !runningNowInstances.some((x) => x.key === selectedKey)) setSelectedKey("");
+  }, [selectedKey, runningNowInstances]);
 
-  const selectedInstance = allInstances.find((x) => x.key === selectedKey) || todaysInstances[0] || null;
+  const selectedInstance = runningNowInstances.find((x) => x.key === selectedKey) || null;
   const selected = selectedInstance?.train || filteredTrains[0] || trains[0] || null;
   const departureDate = selectedInstance?.departureDate || null;
   const stations = selected?.stations || [];
@@ -147,20 +150,31 @@ export default function TrainDashboard() {
 
   const wateringAlerts = useMemo(() => {
     const alerts: { key: string; trainNo: string; station: StationRow; minutes: number; departureDate: Date }[] = [];
-    for (const inst of todaysInstances) {
+    for (const inst of runningNowInstances) {
       for (let i = 0; i < validStations(inst.train.stations).length; i++) {
         const station = validStations(inst.train.stations)[i];
         if (!station.watering) continue;
         const eventTime = rowDateTime(station, inst.departureDate, "arrival") || rowDateTime(station, inst.departureDate, "departure");
         if (!eventTime) continue;
         const diff = Math.round((eventTime.getTime() - now.getTime()) / 60000);
-        if (diff >= 0 && diff <= 20) {
-          alerts.push({ key: `${inst.key}-${station.stationCode}-${i}`, trainNo: inst.train.trainNo, station, minutes: diff, departureDate: inst.departureDate });
+        const key = `${inst.key}-${station.stationCode}-${i}`;
+        if (diff >= 0 && diff <= 20 && !wateringDismissed[key]) {
+          alerts.push({ key, trainNo: inst.train.trainNo, station, minutes: diff, departureDate: inst.departureDate });
         }
       }
     }
     return alerts.sort((a, b) => a.minutes - b.minutes);
-  }, [todaysInstances, now]);
+  }, [runningNowInstances, now, wateringDismissed]);
+
+  useEffect(() => {
+    setWateringCodes((current) => {
+      const next = { ...current };
+      for (const alert of wateringAlerts) {
+        if (!next[alert.key]) next[alert.key] = String(Math.floor(100 + Math.random() * 900));
+      }
+      return next;
+    });
+  }, [wateringAlerts]);
 
   return <main className="page">
     <header className="topbar"><div><div className="eyebrow">ICD / KKF • OPERATIONS CONTROL</div><h1>Train Operations Dashboard</h1><p className="sub">Live schedule • departure date • Day 1/2/3 • geographic route progress</p></div><div className="top-actions"><span className={`live-dot ${loading ? "pulse" : ""}`} /><span>{loading ? "Refreshing…" : "Sheet Connected"}</span><button className="refresh" onClick={load} disabled={loading}>↻ {loading ? "Loading" : "Refresh"}</button></div></header>
@@ -178,13 +192,23 @@ export default function TrainDashboard() {
     <section className="panel map-panel taptrack-shell"><div className="map-topbar"><div><div className="panel-kicker">ICD / KKF • LIVE OPERATIONS MAP</div><h2>Running trains • {todayDay}, {todayDate}</h2></div><div className="map-status"><b><span className="map-live-dot" /> {todaysInstances.length} trains running</b><span>{todaysInstances.length} service instances • schedule based</span></div></div>
       <div className="taptrack-map-stage">
         {wateringAlerts.length > 0 && <div className="watering-alert-stack" aria-live="polite">
-          {wateringAlerts.map((alert) => <button key={alert.key} className="watering-alert" onClick={() => setSelectedKey(`${alert.trainNo}-${dateKey(alert.departureDate)}`)}>
-            <span className="watering-alert-icon">💧</span>
-            <span className="watering-alert-body"><b>WATERING POINT IN {alert.minutes} MIN</b><strong>{alert.trainNo} • {alert.station.stationCode}</strong><small>{alert.station.stationName} • {alert.station.watering}</small></span>
-            <span className="watering-alert-arrow">›</span>
-          </button>)}
+          {wateringAlerts.map((alert) => {
+            const code = wateringCodes[alert.key] || "•••";
+            const input = wateringInputs[alert.key] || "";
+            const solved = input === code;
+            return <div key={alert.key} className="watering-alert">
+              <span className="watering-alert-icon">💧</span>
+              <div className="watering-alert-body">
+                <b>WATERING POINT IN {alert.minutes} MIN</b>
+                <strong>{alert.trainNo} • {alert.station.stationCode}</strong>
+                <small>{alert.station.stationName} • {alert.station.watering}</small>
+                <div className="watering-code-row"><span>CODE <b>{code}</b></span><input value={input} maxLength={3} inputMode="numeric" placeholder="Enter" onChange={(e) => setWateringInputs((v) => ({ ...v, [alert.key]: e.target.value.replace(/\D/g, "").slice(0, 3) }))} /><button disabled={!solved} onClick={() => { setWateringDismissed((v) => ({ ...v, [alert.key]: true })); setWateringInputs((v) => ({ ...v, [alert.key]: "" })); }}>✓</button></div>
+              </div>
+              <button className="watering-alert-arrow" title="Open train route" onClick={() => setSelectedKey(`${alert.trainNo}-${dateKey(alert.departureDate)}`)}>›</button>
+            </div>;
+          })}
         </div>}
-        {todaysInstances.length ? <RouteMap instances={mapInstances} selectedKey={selectedInstance?.key || ""} onTrainClick={(key) => setSelectedKey(key)} /> : <div className="real-map map-loading">No active train instances for today.</div>}
+        {runningNowInstances.length ? <RouteMap instances={mapInstances} selectedKey={selectedInstance?.key || ""} onTrainClick={(key) => setSelectedKey(key)} /> : <div className="real-map map-loading">No train is running at the current scheduled time.</div>}
         <aside className="map-left-drawer">
           <div className="map-brand"><div className="brand-mark">🚆</div><div><b>TapTrack Style</b><span>ICD / KKF</span></div><button onClick={() => setTodayOnly(true)}>Today</button></div>
           <div className="map-search-wrap"><input className="map-search" placeholder="Search train / station…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>

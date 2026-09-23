@@ -110,16 +110,20 @@ export default function RouteMap({
     return { instance, index, points, solid, dotted, current, color: trainColor(index) };
   }), [instances]);
 
-  const allPoints = useMemo(() => routes.flatMap((r) => r.points), [routes]);
-  const center: [number, number] = allPoints.length ? allPoints[Math.floor(allPoints.length / 2)] : [22.5, 79];
+  const selectedRoute = routes.find((r) => r.instance.key === selectedKey);
+  const mapFitPoints = selectedRoute?.points.length ? selectedRoute.points : routes.flatMap((r) => {
+    const station = r.instance.stations.find((s) => s.stationName === r.instance.currentStationName && Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
+    return station ? [[station.latitude as number, station.longitude as number] as [number, number]] : r.points.slice(0, 1);
+  });
+  const center: [number, number] = mapFitPoints.length ? mapFitPoints[Math.floor(mapFitPoints.length / 2)] : [22.5, 79];
 
   return <div className="real-map taptrack-map">
     <MapContainer center={center} zoom={5} scrollWheelZoom className="leaflet-map">
       <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <FitBounds points={allPoints} />
+      <FitBounds points={mapFitPoints} />
       {routes.map((route) => <Fragment key={route.instance.key}>
-        {route.solid.map((line, i) => <Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: route.instance.key === selectedKey ? 6 : 4, opacity: route.instance.key === selectedKey ? 0.95 : 0.58 }} />)}
-        {route.dotted.map((line, i) => <Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: route.instance.key === selectedKey ? 5 : 3, opacity: route.instance.key === selectedKey ? 0.75 : 0.4, dashArray: "7 9" }} />)}
+        {route.instance.key === selectedKey && route.solid.map((line, i) => <Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 6, opacity: 0.95 }} />)}
+        {route.instance.key === selectedKey && route.dotted.map((line, i) => <Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 5, opacity: 0.8, dashArray: "7 9" }} />)}
         {route.points.length > 0 && (() => {
           const routeStations = route.instance.stations
             .filter((s) => !isExcludedStation(s))

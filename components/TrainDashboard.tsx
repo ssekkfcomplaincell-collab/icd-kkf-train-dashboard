@@ -184,8 +184,12 @@ export default function TrainDashboard() {
   const wateringAlerts = useMemo(() => {
     const alerts: { key: string; trainNo: string; station: StationRow; minutes: number; departureDate: Date }[] = [];
     for (const inst of runningNowInstances) {
-      for (let i = 0; i < validStations(inst.train.stations).length; i++) {
-        const station = validStations(inst.train.stations)[i];
+      const routeStations = validStations(inst.train.stations);
+      for (let i = 0; i < routeStations.length; i++) {
+        const station = routeStations[i];
+        // Do not generate a watering popup for the final destination station.
+        // Watering alerts are intended only for intermediate watering points.
+        if (i === routeStations.length - 1) continue;
         if (!station.watering) continue;
         const eventTime = rowDateTime(station, inst.departureDate, "arrival") || rowDateTime(station, inst.departureDate, "departure");
         if (!eventTime) continue;

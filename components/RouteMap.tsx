@@ -139,7 +139,7 @@ export default function RouteMap({
             zIndexOffset={route.instance.key === selectedKey ? 1000 : 200}
           />;
         })()}
-        {route.points.map((point, i) => <CircleMarker key={`p-${route.instance.key}-${i}`} center={point} radius={route.instance.key === selectedKey ? 4 : 3} pathOptions={{ color: route.color, weight: 1, fillOpacity: .85 }} eventHandlers={{ click: () => onTrainClick(route.instance.key) }} />)}
+        {route.instance.key === selectedKey && route.points.map((point, i) => <CircleMarker key={`p-${route.instance.key}-${i}`} center={point} radius={4} pathOptions={{ color: route.color, weight: 1, fillOpacity: .85 }} eventHandlers={{ click: () => onTrainClick(route.instance.key) }} />)}
       </Fragment>)}
     </MapContainer>
     <div className="map-overlay-legend taptrack-legend"><span><i className="solid-swatch" /> Completed</span><span><i className="dotted-swatch" /> Pending</span><span>● Click train number for route</span></div>

@@ -30,7 +30,7 @@ function numberValue(value: string): number | undefined {
 
 async function fetchCsv(url: string): Promise<Record<string, unknown>[]> {
   const response = await fetch(url, {
-    cache: "no-store",
+    next: { revalidate: 60 },
     headers: { "User-Agent": "ICD-KKF-Train-Dashboard/1.0" }
   });
   if (!response.ok) throw new Error(`Google Sheet fetch failed: ${response.status}`);

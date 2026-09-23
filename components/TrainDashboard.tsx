@@ -100,17 +100,50 @@ export default function TrainDashboard() {
   const [wateringDismissed, setWateringDismissed] = useState<Record<string, boolean>>({});
   const [wateringInputs, setWateringInputs] = useState<Record<string, string>>({});
 
-  async function load() {
+  async function load(options: { silent?: boolean; force?: boolean } = {}) {
+    const { silent = false, force = false } = options;
     try {
-      setLoading(true); setError("");
-      const res = await fetch(`/api/trains?refresh=${Date.now()}`, { cache: "no-store" });
+      if (!silent) setLoading(true);
+      setError("");
+      const url = force ? `/api/trains?refresh=${Date.now()}` : "/api/trains";
+      const res = await fetch(url, { cache: force ? "no-store" : "default" });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Unable to load data");
-      setTrains(data.trains); setUpdatedAt(data.updatedAt); setLastRefresh(new Date().toLocaleTimeString());
-    } catch (e: any) { setError(e.message || "Unable to load Google Sheet"); }
-    finally { setLoading(false); }
+      setTrains(data.trains);
+      setUpdatedAt(data.updatedAt);
+      setLastRefresh(new Date().toLocaleTimeString());
+      try {
+        window.localStorage.setItem("icd-kkf-train-cache-v1", JSON.stringify({
+          savedAt: Date.now(),
+          updatedAt: data.updatedAt,
+          trains: data.trains
+        }));
+      } catch { /* localStorage is optional */ }
+    } catch (e: any) {
+      setError(e.message || "Unable to load Google Sheet");
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }
-  useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    let hasCache = false;
+    try {
+      const cached = window.localStorage.getItem("icd-kkf-train-cache-v1");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed?.trains) && parsed.trains.length) {
+          setTrains(parsed.trains);
+          setUpdatedAt(parsed.updatedAt || "");
+          hasCache = true;
+          setLoading(false);
+        }
+      }
+    } catch { /* ignore invalid cache */ }
+
+    // Show cached data immediately, then refresh quietly in the background.
+    void load({ silent: hasCache });
+  }, []);
   useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(id); }, []);
 
   const { date: todayDate, day: todayDay } = todayInfo();
@@ -180,7 +213,7 @@ export default function TrainDashboard() {
   }, [wateringAlerts]);
 
   return <main className="page">
-    <header className="topbar"><div><div className="eyebrow">ICD / KKF • OPERATIONS CONTROL</div><h1>Train Operations Dashboard</h1><p className="sub">Live schedule • departure date • Day 1/2/3 • geographic route progress</p></div><div className="top-actions"><span className={`live-dot ${loading ? "pulse" : ""}`} /><span>{loading ? "Refreshing…" : "Sheet Connected"}</span><button className="refresh" onClick={load} disabled={loading}>↻ {loading ? "Loading" : "Refresh"}</button></div></header>
+    <header className="topbar"><div><div className="eyebrow">ICD / KKF • OPERATIONS CONTROL</div><h1>Train Operations Dashboard</h1><p className="sub">Live schedule • departure date • Day 1/2/3 • geographic route progress</p></div><div className="top-actions"><span className={`live-dot ${loading ? "pulse" : ""}`} /><span>{loading ? "Refreshing…" : "Sheet Connected"}</span><button className="refresh" onClick={() => void load({ force: true })} disabled={loading}>↻ {loading ? "Loading" : "Refresh"}</button></div></header>
     {error && <div className="error"><strong>Data loading error:</strong> {error}<div>Schedule is loaded from the published Google Sheet. Coordinate sheet is optional; stations without valid coordinates are skipped on the map.</div></div>}
 
     <section className="today-banner"><div><span>TODAY</span><strong>{todayDate}</strong><b>{todayDay}</b></div><div><span>ACTIVE / TODAY INSTANCES</span><strong>{todaysInstances.length}</strong><small>Includes previous-day departures still within Day 2/3</small></div><div><span>SELECTED DEPARTURE</span><strong>{departureDate ? departureDate.toLocaleDateString("en-IN") : "—"}</strong><small>{selectedInstance ? `${selectedInstance.status} • Day ${routeDay}` : "Select a train"}</small></div><button className={todayOnly ? "mode active" : "mode"} onClick={() => setTodayOnly((v) => !v)}>{todayOnly ? "✓ Today / Active" : "Show All Trains"}</button></section>

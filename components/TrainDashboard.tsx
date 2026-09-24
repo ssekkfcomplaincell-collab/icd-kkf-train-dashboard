@@ -31,8 +31,12 @@ function isExcludedStation(s: StationRow) {
 }
 function validStations(stations: StationRow[]) { return stations.filter((s) => !isExcludedStation(s)); }
 function timeToMinutes(value: string) { const m = value.match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
+function scheduleDayNumber(value: string) {
+  const m = String(value ?? "").match(/\d+/);
+  return m ? Number(m[0]) : NaN;
+}
 function rowDateTime(station: StationRow, departureDate: Date, field: "arrival" | "departure") {
-  const day = Number.parseInt(station.day, 10);
+  const day = scheduleDayNumber(station.day);
   const tm = station[field].match(/^(\d{1,2}):(\d{2})$/);
   if (!Number.isFinite(day) || !tm) return null;
   const d = new Date(departureDate);
@@ -70,7 +74,7 @@ function serviceInstance(train: Train, departureDate: Date, now: Date): ServiceI
 
 function activeInstances(train: Train, now: Date): ServiceInstance[] {
   const stations = validStations(train.stations);
-  const maxDay = Math.max(1, ...stations.map((s) => Number.parseInt(s.day, 10)).filter(Number.isFinite));
+  const maxDay = Math.max(1, ...stations.map((s) => scheduleDayNumber(s.day)).filter(Number.isFinite));
   const out: ServiceInstance[] = [];
   for (let back = 0; back < maxDay; back++) {
     const depDate = atMidnight(new Date(now));

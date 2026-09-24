@@ -24,8 +24,12 @@ function pick(row: Record<string, unknown>, names: string[]): string {
 }
 
 function numberValue(value: string): number | undefined {
-  const n = Number(value);
+  const n = Number(String(value).replace(/,/g, "").trim());
   return Number.isFinite(n) && n !== 0 ? n : undefined;
+}
+
+function isYes(value: unknown): boolean {
+  return ["Y", "YES", "TRUE", "1"].includes(clean(value).toUpperCase());
 }
 
 async function fetchCsv(url: string): Promise<Record<string, unknown>[]> {
@@ -96,7 +100,7 @@ export async function getTrainData(): Promise<Train[]> {
   for (const row of rows) {
     if (!groups.has(row.trainNo)) {
       const runningDays = Object.fromEntries(
-        WEEKDAYS.map((day) => [day, pick(row, [day]).toUpperCase() === "Y"])
+        WEEKDAYS.map((day) => [day, isYes(pick(row, [day]))])
       ) as Record<Weekday, boolean>;
       groups.set(row.trainNo, { trainNo: row.trainNo, no: "", stations: [], runningDays });
     }

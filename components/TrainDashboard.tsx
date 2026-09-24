@@ -110,8 +110,9 @@ export default function TrainDashboard() {
     try {
       if (!silent) setLoading(true);
       setError("");
-      const url = force ? `/api/trains?refresh=${Date.now()}` : "/api/trains";
-      const res = await fetch(url, { cache: force ? "no-store" : "default" });
+      // Always render cached/local data first. Network refresh is background-only.
+      // The API itself deduplicates the full Google Sheet fetch for 60 seconds.
+      const res = await fetch("/api/trains", { cache: "default" });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Unable to load data");
       setTrains(data.trains);
@@ -148,6 +149,13 @@ export default function TrainDashboard() {
 
     // Show cached data immediately, then refresh quietly in the background.
     void load({ silent: hasCache });
+
+    // Quietly revalidate in the background. The page never blanks while the
+    // sheet is being fetched, and the API reuses its server-side cache.
+    const refreshId = window.setInterval(() => {
+      void load({ silent: true });
+    }, 60_000);
+    return () => window.clearInterval(refreshId);
   }, []);
   useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(id); }, []);
 

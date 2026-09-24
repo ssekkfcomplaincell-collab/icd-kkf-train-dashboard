@@ -9,6 +9,13 @@ const COORDINATE_SHEET_GID = "1506639435";
 const DEFAULT_COORDINATES_CSV_URL =
   `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=${COORDINATE_SHEET_GID}`;
 
+// Server-side cache: fetch the complete sheets once, then reuse the parsed
+// result for 60 seconds. This prevents repeated/duplicate Google Sheet
+// downloads on every refresh while still picking up changes automatically.
+const CACHE_TTL_MS = 60_000;
+let trainCache: { data: Train[]; savedAt: number } | null = null;
+let trainFetchInFlight: Promise<Train[]> | null = null;
+
 const WEEKDAYS: Weekday[] = [
   "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
 ];
@@ -56,7 +63,7 @@ function isExcludedRow(row: Record<string, unknown>) {
   return text.includes("deleted") || text.includes("via station");
 }
 
-export async function getTrainData(): Promise<Train[]> {
+async function fetchAndBuildTrainData(): Promise<Train[]> {
   const scheduleUrl = process.env.GOOGLE_SHEET_CSV_URL || DEFAULT_SCHEDULE_CSV_URL;
   const coordinateUrl = process.env.GOOGLE_COORDINATES_CSV_URL || DEFAULT_COORDINATES_CSV_URL;
 
@@ -117,4 +124,28 @@ export async function getTrainData(): Promise<Train[]> {
   return Array.from(groups.values()).sort((a, b) =>
     a.trainNo.localeCompare(b.trainNo, undefined, { numeric: true })
   );
+}
+
+
+export async function getTrainData(options: { force?: boolean } = {}): Promise<Train[]> {
+  const now = Date.now();
+  const force = options.force === true;
+
+  if (!force && trainCache && now - trainCache.savedAt < CACHE_TTL_MS) {
+    return trainCache.data;
+  }
+
+  // Collapse simultaneous refreshes into one Google Sheet fetch.
+  if (trainFetchInFlight) return trainFetchInFlight;
+
+  trainFetchInFlight = fetchAndBuildTrainData()
+    .then((data) => {
+      trainCache = { data, savedAt: Date.now() };
+      return data;
+    })
+    .finally(() => {
+      trainFetchInFlight = null;
+    });
+
+  return trainFetchInFlight;
 }

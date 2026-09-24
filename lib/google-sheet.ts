@@ -29,10 +29,18 @@ function numberValue(value: string): number | undefined {
 }
 
 async function fetchCsv(url: string): Promise<Record<string, unknown>[]> {
-  const response = await fetch(url, {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  let response: Response;
+  try {
+    response = await fetch(url, {
     next: { revalidate: 60 },
-    headers: { "User-Agent": "ICD-KKF-Train-Dashboard/1.0" }
-  });
+    headers: { "User-Agent": "ICD-KKF-Train-Dashboard/1.0" },
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) throw new Error(`Google Sheet fetch failed: ${response.status}`);
   const csv = await response.text();
   const parsed = Papa.parse<Record<string, unknown>>(csv, { header: true, skipEmptyLines: true });

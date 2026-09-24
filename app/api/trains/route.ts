@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getTrainData } from "@/lib/google-sheet";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
+export const maxDuration = 30;
 
 export async function GET() {
   try {

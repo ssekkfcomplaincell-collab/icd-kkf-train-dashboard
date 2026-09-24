@@ -15,7 +15,7 @@ export type MapTrainInstance = {
 };
 
 function isExcludedStation(station: StationRow) {
-  const text = Object.values(station.raw || {}).join(" ").toLowerCase() + ` ${station.arrival} ${station.stationName}`.toLowerCase();
+  const text = `${station.stationCode} ${station.stationName} ${station.trainNo} ${station.section} ${station.watering} ${station.arrival} ${station.departure}`.toLowerCase();
   return text.includes("deleted") || text.includes("via station");
 }
 
@@ -24,8 +24,11 @@ const INDIA_BOUNDS: [[number, number], [number, number]] = [[7.8, 68.0], [37.2, 
 function FitBounds({ points, selected }: { points: [number, number][], selected: boolean }) {
   const map = useMap();
   useEffect(() => {
-    if (selected && points.length) {
-      map.fitBounds(points, { padding: [45, 45], maxZoom: 7 });
+    if (points.length) {
+      // When no train is selected, frame only the stations/current positions
+      // of trains that are running now. This keeps the map close to the
+      // operational area instead of showing the whole country.
+      map.fitBounds(points, { padding: selected ? [45, 45] : [70, 70], maxZoom: selected ? 8 : 7.5 });
       return;
     }
     map.fitBounds(INDIA_BOUNDS, { padding: [12, 12], maxZoom: 5.6 });
@@ -129,13 +132,25 @@ export default function RouteMap({
   }), [instances]);
 
   const selectedRoute = routes.find((r) => r.instance.key === selectedKey);
-  const mapFitPoints = selectedRoute?.points.length ? selectedRoute.points : [];
+  const visibleRoutes = selectedKey ? routes.filter((r) => r.instance.key === selectedKey) : routes;
+  const runningPoints = visibleRoutes
+    .map((r) => {
+      const routeStations = r.instance.stations
+        .filter((s) => !isExcludedStation(s))
+        .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
+      const currentStation = routeStations.find((s) => s.stationName === r.instance.currentStationName);
+      return currentStation
+        ? [currentStation.latitude as number, currentStation.longitude as number] as [number, number]
+        : r.current || r.points[Math.max(0, Math.min(r.points.length - 1, Math.round((r.instance.percent / 100) * (r.points.length - 1))))];
+    })
+    .filter(Boolean) as [number, number][];
+  const mapFitPoints = selectedRoute?.points.length ? selectedRoute.points : runningPoints;
   const center: [number, number] = [22.5, 79.0];
 
   return <div className="real-map taptrack-map">
     <MapContainer
       center={center}
-      zoom={5.2}
+      zoom={6.2}
       minZoom={4.8}
       maxZoom={12}
       maxBounds={[[5.5, 66.5], [38.5, 99.5]]}

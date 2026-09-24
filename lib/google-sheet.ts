@@ -9,6 +9,13 @@ const COORDINATE_SHEET_GID = "1506639435";
 const DEFAULT_COORDINATES_CSV_URL =
   `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=${COORDINATE_SHEET_GID}`;
 
+// Server-side cache: fetch the complete sheets once, then reuse the parsed
+// result for 60 seconds. This prevents repeated/duplicate Google Sheet
+// downloads on every refresh while still picking up changes automatically.
+const CACHE_TTL_MS = 60_000;
+let trainCache: { data: Train[]; savedAt: number } | null = null;
+let trainFetchInFlight: Promise<Train[]> | null = null;
+
 const WEEKDAYS: Weekday[] = [
   "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
 ];
@@ -24,8 +31,12 @@ function pick(row: Record<string, unknown>, names: string[]): string {
 }
 
 function numberValue(value: string): number | undefined {
-  const n = Number(value);
+  const n = Number(String(value).replace(/,/g, "").trim());
   return Number.isFinite(n) && n !== 0 ? n : undefined;
+}
+
+function isYes(value: unknown): boolean {
+  return ["Y", "YES", "TRUE", "1"].includes(clean(value).toUpperCase());
 }
 
 async function fetchCsv(url: string): Promise<Record<string, unknown>[]> {
@@ -52,7 +63,7 @@ function isExcludedRow(row: Record<string, unknown>) {
   return text.includes("deleted") || text.includes("via station");
 }
 
-export async function getTrainData(): Promise<Train[]> {
+async function fetchAndBuildTrainData(): Promise<Train[]> {
   const scheduleUrl = process.env.GOOGLE_SHEET_CSV_URL || DEFAULT_SCHEDULE_CSV_URL;
   const coordinateUrl = process.env.GOOGLE_COORDINATES_CSV_URL || DEFAULT_COORDINATES_CSV_URL;
 
@@ -71,45 +82,76 @@ export async function getTrainData(): Promise<Train[]> {
     }
   }
 
-  const rows: StationRow[] = scheduleRows
-    .filter((row) => !isExcludedRow(row))
-    .map((row) => {
-      const stationCode = pick(row, ["Station Code"]);
-      const coordinate = coordinates.get(stationCode.toUpperCase());
-      return {
-        no: pick(row, ["NO"]),
-        trainNo: pick(row, ["Train No", "Train No."]),
-        sno: pick(row, ["S. No.", "S. No"]),
-        stationCode,
-        stationName: pick(row, ["Station Name"]),
-        routeNo: pick(row, ["Route No.", "Route No"]),
-        arrival: pick(row, ["Arrival Time"]),
-        departure: pick(row, ["Departure Time"]),
-        halt: pick(row, ["Halt Time (In Minutes)", "Halt Time"]),
-        distance: pick(row, ["Distance"]),
-        day: pick(row, ["Day"]),
-        section: pick(row, ["Section"]),
-        sectionKm: pick(row, ["Section KM"]),
-        watering: pick(row, ["Watering Station (S/W, O/D)", "Watering Station"]),
-        latitude: coordinate?.latitude,
-        longitude: coordinate?.longitude,
-        raw: Object.fromEntries(Object.entries(row).map(([k, v]) => [k.trim(), clean(v)]))
-      };
-    })
-    .filter((r) => r.trainNo && (r.stationCode || r.stationName));
-
+  // IMPORTANT: weekday flags live in the original Google Sheet rows and are
+  // often present only on the first/source row of a train. Do NOT map them
+  // away before grouping, otherwise every train can incorrectly become
+  // "not running". Build the train groups directly from the raw rows and
+  // OR the weekday flags across every row belonging to the train.
   const groups = new Map<string, Train>();
-  for (const row of rows) {
-    if (!groups.has(row.trainNo)) {
+
+  for (const rawRow of scheduleRows) {
+    if (isExcludedRow(rawRow)) continue;
+
+    const trainNo = pick(rawRow, ["Train No", "Train No."]);
+    const stationCode = pick(rawRow, ["Station Code"]);
+    const stationName = pick(rawRow, ["Station Name"]);
+    if (!trainNo || (!stationCode && !stationName)) continue;
+
+    let train = groups.get(trainNo);
+    if (!train) {
       const runningDays = Object.fromEntries(
-        WEEKDAYS.map((day) => [day, clean(row.raw[day]).toUpperCase() === "Y"])
+        WEEKDAYS.map((day) => [day, false])
       ) as Record<Weekday, boolean>;
-      groups.set(row.trainNo, { trainNo: row.trainNo, no: row.no, stations: [], runningDays });
+      train = { trainNo, no: "", stations: [], runningDays };
+      groups.set(trainNo, train);
     }
-    groups.get(row.trainNo)!.stations.push(row);
+
+    // A weekday can be marked on only one source row, so retain it at train
+    // level instead of relying on repeated values in every station row.
+    for (const day of WEEKDAYS) {
+      if (isYes(pick(rawRow, [day]))) train.runningDays[day] = true;
+    }
+
+    const coordinate = coordinates.get(stationCode.toUpperCase());
+    train.stations.push({
+      trainNo,
+      stationCode,
+      stationName,
+      arrival: pick(rawRow, ["Arrival Time"]),
+      departure: pick(rawRow, ["Departure Time"]),
+      distance: pick(rawRow, ["Distance"]),
+      day: pick(rawRow, ["Day"]),
+      section: pick(rawRow, ["Section"]),
+      watering: pick(rawRow, ["Watering Station (S/W, O/D)", "Watering Station"]),
+      latitude: coordinate?.latitude,
+      longitude: coordinate?.longitude
+    });
   }
 
   return Array.from(groups.values()).sort((a, b) =>
     a.trainNo.localeCompare(b.trainNo, undefined, { numeric: true })
   );
+}
+
+export async function getTrainData(options: { force?: boolean } = {}): Promise<Train[]> {
+  const now = Date.now();
+  const force = options.force === true;
+
+  if (!force && trainCache && now - trainCache.savedAt < CACHE_TTL_MS) {
+    return trainCache.data;
+  }
+
+  // Collapse simultaneous refreshes into one Google Sheet fetch.
+  if (trainFetchInFlight) return trainFetchInFlight;
+
+  trainFetchInFlight = fetchAndBuildTrainData()
+    .then((data) => {
+      trainCache = { data, savedAt: Date.now() };
+      return data;
+    })
+    .finally(() => {
+      trainFetchInFlight = null;
+    });
+
+  return trainFetchInFlight;
 }

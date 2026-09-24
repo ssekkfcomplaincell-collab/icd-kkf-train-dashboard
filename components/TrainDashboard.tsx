@@ -26,7 +26,7 @@ function todayInfo() {
 function wateringClass(value: string) { const v = value.toUpperCase(); if (v.includes("S/W")) return "sw"; if (v.includes("O/D")) return "od"; return ""; }
 function firstTime(stations: StationRow[], field: "arrival" | "departure") { return stations.find((s) => /^\d{1,2}:\d{2}$/.test(s[field]))?.[field] || "—"; }
 function isExcludedStation(s: StationRow) {
-  const text = Object.values(s.raw || {}).join(" ").toLowerCase() + ` ${s.arrival} ${s.stationName}`.toLowerCase();
+  const text = `${s.stationCode} ${s.stationName} ${s.trainNo} ${s.section} ${s.watering} ${s.arrival} ${s.departure}`.toLowerCase();
   return text.includes("deleted") || text.includes("via station");
 }
 function validStations(stations: StationRow[]) { return stations.filter((s) => !isExcludedStation(s)); }
@@ -226,7 +226,7 @@ export default function TrainDashboard() {
       <div className="top-actions">
         <span className={`live-dot ${loading ? "pulse" : ""}`} />
         <span>{loading ? "Refreshing…" : "Sheet Connected"}</span>
-        <button className="refresh" onClick={() => void load({ force: true })} disabled={loading}>↻ {loading ? "Loading" : "Refresh"}</button>
+        <button className="refresh" onClick={() => void load({ silent: true, force: true })}>↻ Refresh</button>
       </div>
     </header>
 

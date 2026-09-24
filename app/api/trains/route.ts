@@ -6,6 +6,9 @@ export const revalidate = 0;
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
+// Keep the route dynamic; Google Sheets is fetched at request time, never during build.
+
+
 export async function GET() {
   try {
     const trains = await getTrainData();

@@ -77,23 +77,17 @@ export async function getTrainData(): Promise<Train[]> {
       const stationCode = pick(row, ["Station Code"]);
       const coordinate = coordinates.get(stationCode.toUpperCase());
       return {
-        no: pick(row, ["NO"]),
         trainNo: pick(row, ["Train No", "Train No."]),
-        sno: pick(row, ["S. No.", "S. No"]),
         stationCode,
         stationName: pick(row, ["Station Name"]),
-        routeNo: pick(row, ["Route No.", "Route No"]),
         arrival: pick(row, ["Arrival Time"]),
         departure: pick(row, ["Departure Time"]),
-        halt: pick(row, ["Halt Time (In Minutes)", "Halt Time"]),
         distance: pick(row, ["Distance"]),
         day: pick(row, ["Day"]),
         section: pick(row, ["Section"]),
-        sectionKm: pick(row, ["Section KM"]),
         watering: pick(row, ["Watering Station (S/W, O/D)", "Watering Station"]),
         latitude: coordinate?.latitude,
-        longitude: coordinate?.longitude,
-        raw: Object.fromEntries(Object.entries(row).map(([k, v]) => [k.trim(), clean(v)]))
+        longitude: coordinate?.longitude
       };
     })
     .filter((r) => r.trainNo && (r.stationCode || r.stationName));
@@ -102,9 +96,9 @@ export async function getTrainData(): Promise<Train[]> {
   for (const row of rows) {
     if (!groups.has(row.trainNo)) {
       const runningDays = Object.fromEntries(
-        WEEKDAYS.map((day) => [day, clean(row.raw[day]).toUpperCase() === "Y"])
+        WEEKDAYS.map((day) => [day, pick(row, [day]).toUpperCase() === "Y"])
       ) as Record<Weekday, boolean>;
-      groups.set(row.trainNo, { trainNo: row.trainNo, no: row.no, stations: [], runningDays });
+      groups.set(row.trainNo, { trainNo: row.trainNo, no: "", stations: [], runningDays });
     }
     groups.get(row.trainNo)!.stations.push(row);
   }

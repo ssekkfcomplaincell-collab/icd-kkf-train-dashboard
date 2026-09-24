@@ -1,15 +1,21 @@
 export type StationRow = {
+  no: string;
   trainNo: string;
+  sno: string;
   stationCode: string;
   stationName: string;
+  routeNo: string;
   arrival: string;
   departure: string;
-  day: string;
+  halt: string;
   distance: string;
+  day: string;
   section: string;
+  sectionKm: string;
   watering: string;
   latitude?: number;
   longitude?: number;
+  raw: Record<string, string>;
 };
 
 export type Weekday =

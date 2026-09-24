@@ -26,17 +26,13 @@ function todayInfo() {
 function wateringClass(value: string) { const v = value.toUpperCase(); if (v.includes("S/W")) return "sw"; if (v.includes("O/D")) return "od"; return ""; }
 function firstTime(stations: StationRow[], field: "arrival" | "departure") { return stations.find((s) => /^\d{1,2}:\d{2}$/.test(s[field]))?.[field] || "—"; }
 function isExcludedStation(s: StationRow) {
-  const text = `${s.stationCode} ${s.stationName} ${s.trainNo} ${s.section} ${s.watering} ${s.arrival} ${s.departure}`.toLowerCase();
+  const text = Object.values(s.raw || {}).join(" ").toLowerCase() + ` ${s.arrival} ${s.stationName}`.toLowerCase();
   return text.includes("deleted") || text.includes("via station");
 }
 function validStations(stations: StationRow[]) { return stations.filter((s) => !isExcludedStation(s)); }
 function timeToMinutes(value: string) { const m = value.match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
-function scheduleDayNumber(value: string) {
-  const m = String(value ?? "").match(/\d+/);
-  return m ? Number(m[0]) : NaN;
-}
 function rowDateTime(station: StationRow, departureDate: Date, field: "arrival" | "departure") {
-  const day = scheduleDayNumber(station.day);
+  const day = Number.parseInt(station.day, 10);
   const tm = station[field].match(/^(\d{1,2}):(\d{2})$/);
   if (!Number.isFinite(day) || !tm) return null;
   const d = new Date(departureDate);
@@ -74,7 +70,7 @@ function serviceInstance(train: Train, departureDate: Date, now: Date): ServiceI
 
 function activeInstances(train: Train, now: Date): ServiceInstance[] {
   const stations = validStations(train.stations);
-  const maxDay = Math.max(1, ...stations.map((s) => scheduleDayNumber(s.day)).filter(Number.isFinite));
+  const maxDay = Math.max(1, ...stations.map((s) => Number.parseInt(s.day, 10)).filter(Number.isFinite));
   const out: ServiceInstance[] = [];
   for (let back = 0; back < maxDay; back++) {
     const depDate = atMidnight(new Date(now));
@@ -110,9 +106,8 @@ export default function TrainDashboard() {
     try {
       if (!silent) setLoading(true);
       setError("");
-      // Always render cached/local data first. Network refresh is background-only.
-      // The API itself deduplicates the full Google Sheet fetch for 60 seconds.
-      const res = await fetch("/api/trains", { cache: "default" });
+      const url = force ? `/api/trains?refresh=${Date.now()}` : "/api/trains";
+      const res = await fetch(url, { cache: force ? "no-store" : "default" });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Unable to load data");
       setTrains(data.trains);
@@ -149,13 +144,6 @@ export default function TrainDashboard() {
 
     // Show cached data immediately, then refresh quietly in the background.
     void load({ silent: hasCache });
-
-    // Quietly revalidate in the background. The page never blanks while the
-    // sheet is being fetched, and the API reuses its server-side cache.
-    const refreshId = window.setInterval(() => {
-      void load({ silent: true });
-    }, 60_000);
-    return () => window.clearInterval(refreshId);
   }, []);
   useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(id); }, []);
 
@@ -238,7 +226,7 @@ export default function TrainDashboard() {
       <div className="top-actions">
         <span className={`live-dot ${loading ? "pulse" : ""}`} />
         <span>{loading ? "Refreshing…" : "Sheet Connected"}</span>
-        <button className="refresh" onClick={() => void load({ silent: true, force: true })}>↻ Refresh</button>
+        <button className="refresh" onClick={() => void load({ force: true })} disabled={loading}>↻ {loading ? "Loading" : "Refresh"}</button>
       </div>
     </header>
 

@@ -6,15 +6,9 @@ export const revalidate = 0;
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-// Keep the route dynamic; Google Sheets is fetched at request time, never during build.
-
-
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    // Refresh requests are intentionally soft: the server cache is reused
-    // within its TTL so repeated clicks do not download the same sheet again.
-    // A cold server or expired cache performs the full sheet fetch.
-    const trains = await getTrainData({ force: false });
+    const trains = await getTrainData();
 
     return NextResponse.json(
       {

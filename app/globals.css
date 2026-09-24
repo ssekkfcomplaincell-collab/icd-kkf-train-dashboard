@@ -139,3 +139,26 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 @keyframes wateringPulse { 0%,100% { box-shadow:0 10px 28px rgba(15,23,42,.18); } 50% { box-shadow:0 10px 28px rgba(22,163,111,.28), 0 0 0 3px rgba(22,163,111,.08); } }
 @media (max-width:1100px) { .watering-alert-stack { right:14px; top:300px; width:285px; } }
 @media (max-width:700px) { .watering-alert-stack { left:10px; right:10px; top:255px; width:auto; } }
+
+/* Map-only dashboard layout */
+.map-only-page { max-width:none; width:100%; min-height:100vh; padding:14px; }
+.map-only-header { display:flex; justify-content:space-between; align-items:center; gap:15px; margin-bottom:10px; padding:2px 4px; }
+.map-only-header h1 { margin:3px 0 0; font-size:24px; letter-spacing:-.03em; }
+.map-only-panel { margin:0; }
+.map-only-stage { height:calc(100vh - 92px); min-height:620px; }
+.map-left-drawer.collapsed { width:190px; max-height:none; }
+.running-dropdown-button { width:100%; display:flex; align-items:center; gap:9px; border:0; background:#fff; padding:12px 13px; cursor:pointer; text-align:left; }
+.running-dropdown-button:hover { background:#f7fafc; }
+.running-dropdown-icon { width:32px; height:32px; display:grid; place-items:center; border-radius:9px; background:#eef6fb; font-size:17px; flex:0 0 auto; }
+.running-dropdown-button b { display:block; color:#16283b; font-size:12px; letter-spacing:.04em; }
+.running-dropdown-button small { display:block; margin-top:2px; color:#718096; font-size:9px; }
+.running-chevron { margin-left:auto; color:#1769aa; font-size:17px; font-weight:900; }
+.running-close { margin-left:auto !important; width:27px; height:27px; padding:0 !important; border:1px solid #d8e4ec !important; background:#f7fafc !important; color:#68798b !important; border-radius:7px !important; font-size:18px !important; line-height:1; cursor:pointer; }
+.map-list-footer span:last-child { color:#1769aa; }
+@media (max-width:700px) {
+  .map-only-page { padding:8px; }
+  .map-only-header h1 { font-size:18px; }
+  .map-only-header .top-actions > span:not(.live-dot) { display:none; }
+  .map-only-stage { height:calc(100vh - 72px); min-height:600px; }
+  .map-left-drawer.collapsed { width:180px; right:auto; }
+}

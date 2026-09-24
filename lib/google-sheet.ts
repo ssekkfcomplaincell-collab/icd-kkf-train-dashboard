@@ -99,12 +99,19 @@ export async function getTrainData(): Promise<Train[]> {
   const groups = new Map<string, Train>();
   for (const row of rows) {
     if (!groups.has(row.trainNo)) {
+      // Weekday flags are not guaranteed to be repeated on every station row.
+      // Build them as an OR across ALL rows belonging to the train so a blank
+      // first/source row cannot accidentally make the whole train non-running.
       const runningDays = Object.fromEntries(
-        WEEKDAYS.map((day) => [day, isYes(pick(row, [day]))])
+        WEEKDAYS.map((day) => [day, false])
       ) as Record<Weekday, boolean>;
       groups.set(row.trainNo, { trainNo: row.trainNo, no: "", stations: [], runningDays });
     }
-    groups.get(row.trainNo)!.stations.push(row);
+    const train = groups.get(row.trainNo)!;
+    train.stations.push(row);
+    for (const day of WEEKDAYS) {
+      if (isYes(pick(row, [day]))) train.runningDays[day] = true;
+    }
   }
 
   return Array.from(groups.values()).sort((a, b) =>

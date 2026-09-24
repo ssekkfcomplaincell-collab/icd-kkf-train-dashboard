@@ -19,12 +19,17 @@ function isExcludedStation(station: StationRow) {
   return text.includes("deleted") || text.includes("via station");
 }
 
-function FitBounds({ points }: { points: [number, number][] }) {
+const INDIA_BOUNDS: [[number, number], [number, number]] = [[7.8, 68.0], [37.2, 97.5]];
+
+function FitBounds({ points, selected }: { points: [number, number][], selected: boolean }) {
   const map = useMap();
   useEffect(() => {
-    if (!points.length) return;
-    map.fitBounds(points, { padding: [55, 55], maxZoom: 7 });
-  }, [map, points]);
+    if (selected && points.length) {
+      map.fitBounds(points, { padding: [45, 45], maxZoom: 7 });
+      return;
+    }
+    map.fitBounds(INDIA_BOUNDS, { padding: [12, 12], maxZoom: 5.6 });
+  }, [map, points, selected]);
   return null;
 }
 
@@ -124,16 +129,22 @@ export default function RouteMap({
   }), [instances]);
 
   const selectedRoute = routes.find((r) => r.instance.key === selectedKey);
-  const mapFitPoints = selectedRoute?.points.length ? selectedRoute.points : routes.flatMap((r) => {
-    const station = r.instance.stations.find((s) => s.stationName === r.instance.currentStationName && Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
-    return station ? [[station.latitude as number, station.longitude as number] as [number, number]] : r.points.slice(0, 1);
-  });
-  const center: [number, number] = mapFitPoints.length ? mapFitPoints[Math.floor(mapFitPoints.length / 2)] : [22.5, 79];
+  const mapFitPoints = selectedRoute?.points.length ? selectedRoute.points : [];
+  const center: [number, number] = [22.5, 79.0];
 
   return <div className="real-map taptrack-map">
-    <MapContainer center={center} zoom={5} scrollWheelZoom className="leaflet-map">
+    <MapContainer
+      center={center}
+      zoom={5.2}
+      minZoom={4.8}
+      maxZoom={12}
+      maxBounds={[[5.5, 66.5], [38.5, 99.5]]}
+      maxBoundsViscosity={1.0}
+      scrollWheelZoom
+      className="leaflet-map"
+    >
       <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <FitBounds points={mapFitPoints} />
+      <FitBounds points={mapFitPoints} selected={Boolean(selectedRoute)} />
       {routes.map((route) => <Fragment key={route.instance.key}>
         {route.instance.key === selectedKey && route.solid.map((line, i) => <Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 6, opacity: 0.95 }} />)}
         {route.instance.key === selectedKey && route.dotted.map((line, i) => <Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 5, opacity: 0.8, dashArray: "7 9" }} />)}

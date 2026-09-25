@@ -136,9 +136,10 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .watering-code-row button { width:25px; height:24px; border:0; border-radius:6px; background:#16a36f; color:white; font-weight:800; cursor:pointer; }
 .watering-code-row button:disabled { background:#cbd5d1; cursor:not-allowed; }
 
+
 @keyframes wateringPulse { 0%,100% { box-shadow:0 10px 28px rgba(15,23,42,.18); } 50% { box-shadow:0 10px 28px rgba(22,163,111,.28), 0 0 0 3px rgba(22,163,111,.08); } }
 @media (max-width:1100px) { .watering-alert-stack { right:14px; top:300px; width:285px; } }
-@media (max-width:700px) { .watering-alert-stack { left:auto; right:10px; top:10px; width:285px; max-width:calc(100vw - 20px); } }
+@media (max-width:700px) { .watering-alert-stack { left:auto; right:10px; top:10px; width:285px; } }
 
 /* Map-only dashboard layout */
 .map-only-page { max-width:none; width:100%; min-height:100vh; padding:14px; }
@@ -163,28 +164,114 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
   .map-left-drawer.collapsed { width:180px; right:auto; }
 }
 
-/* Simple full-screen map mode: map stays primary, controls float above it. */
-.map-only-page { max-width:none !important; width:100%; min-height:100vh; height:100vh; padding:0 !important; margin:0 !important; background:#e7ebef; }
-.map-only-panel { margin:0 !important; border:0 !important; border-radius:0 !important; box-shadow:none !important; height:100vh; }
-.map-only-stage { height:100vh !important; min-height:0 !important; }
-.map-only-header, .map-topbar { display:none !important; }
-.simple-map-brand { position:absolute; z-index:1300; left:12px; top:12px; display:flex; align-items:center; gap:8px; min-width:185px; padding:8px 9px; border:1px solid rgba(220,228,235,.95); border-radius:12px; background:rgba(255,255,255,.96); box-shadow:0 7px 24px rgba(15,23,42,.14); }
-.simple-brand-mark { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; background:#eef6fb; font-size:15px; }
-.simple-map-brand b { display:block; font-size:12px; line-height:1.1; color:#253548; }
-.simple-map-brand span { display:block; margin-top:2px; font-size:8px; color:#8290a0; }
-.simple-map-brand button { margin-left:auto; width:27px; height:27px; border:1px solid #dbe5ec; border-radius:8px; background:#fff; color:#1769aa; font-weight:900; cursor:pointer; }
-.simple-map-status { position:absolute; z-index:1300; top:12px; right:12px; display:flex; align-items:center; gap:8px; min-width:155px; padding:9px 12px; border:1px solid rgba(220,228,235,.95); border-radius:12px; background:rgba(255,255,255,.96); box-shadow:0 7px 24px rgba(15,23,42,.14); }
-.simple-map-status .map-live-dot { flex:0 0 auto; margin-right:0; width:7px; height:7px; }
-.simple-map-status b { display:block; color:#253548; font-size:11px; }
-.simple-map-status small { display:block; margin-top:2px; color:#8290a0; font-size:8px; }
-.map-left-drawer { top:58px !important; left:12px !important; }
-.watering-alert-stack { top:62px !important; right:12px !important; width:285px !important; }
-.map-right-drawer { top:62px !important; right:12px !important; bottom:12px !important; }
-.map-error-float { position:fixed; z-index:2000; top:70px; left:50%; transform:translateX(-50%); padding:8px 12px; border-radius:9px; background:#fff4f4; color:#a13b3b; border:1px solid #f0cccc; box-shadow:0 7px 20px rgba(15,23,42,.12); font-size:10px; }
+
+/* =========================================================
+   ICD / KKF — compact TapTrack-style floating map UI
+   ========================================================= */
+.map-only-page { position:relative; max-width:none; width:100%; min-height:100vh; padding:0; background:var(--bg); }
+.map-only-panel { margin:0; border:0; border-radius:0; box-shadow:none; background:var(--panel); }
+.map-only-stage { height:100vh; min-height:620px; position:relative; }
+.taptrack-map-stage .real-map { height:100%; border-radius:0; }
+
+.map-floating-brand {
+  position:absolute; z-index:1300; top:14px; left:14px; min-width:255px;
+  display:flex; align-items:center; gap:10px; padding:9px 10px;
+  background:rgba(255,255,255,.96); border:1px solid rgba(215,224,233,.95);
+  border-radius:14px; box-shadow:0 8px 26px rgba(15,23,42,.13); backdrop-filter:blur(10px);
+}
+.map-brand-logo { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:#eef6fb; font-size:17px; }
+.map-floating-brand b { display:block; font-size:13px; letter-spacing:.01em; color:#18283a; }
+.map-floating-brand small { display:block; margin-top:2px; color:#748294; font-size:9px; }
+.theme-toggle-map { margin-left:auto; width:32px; height:32px; border:1px solid #dbe4ec; border-radius:9px; background:#f8fafc; color:#334155; cursor:pointer; font-size:17px; display:grid; place-items:center; }
+.theme-toggle-map:hover,.map-control-btn:hover { background:#eef5fa; border-color:#c4d7e6; }
+
+.map-floating-controls { position:absolute; z-index:1300; top:14px; right:14px; display:flex; align-items:center; gap:7px; }
+.map-running-pill { min-height:38px; display:flex; align-items:center; gap:6px; padding:0 12px; background:rgba(255,255,255,.96); border:1px solid rgba(215,224,233,.95); border-radius:13px; box-shadow:0 8px 26px rgba(15,23,42,.13); backdrop-filter:blur(10px); }
+.map-running-pill b { font-size:13px; color:#1f3042; }
+.map-running-pill small { font-size:9px; color:#6f7e8f; font-weight:700; }
+.map-control-btn { width:38px; height:38px; border:1px solid #d7e0e9; border-radius:11px; background:rgba(255,255,255,.96); color:#53667a; box-shadow:0 8px 26px rgba(15,23,42,.13); cursor:pointer; font-size:18px; font-weight:800; display:grid; place-items:center; backdrop-filter:blur(10px); }
+.map-control-btn.fit { font-size:20px; }
+.map-control-btn.active { background:#eaf4fb; color:#1769aa; border-color:#a9cce5; }
+.map-error { position:absolute; z-index:1600; top:62px; left:50%; transform:translateX(-50%); width:min(700px,calc(100% - 28px)); margin:0; }
+
+/* Keep watering alert centered and identical on desktop + mobile. */
+.watering-alert-stack { left:50% !important; right:auto !important; top:78px !important; transform:translateX(-50%); width:min(360px,calc(100% - 24px)) !important; }
+.watering-alert { min-height:72px; }
+.watering-alert-body { flex:1 1 auto; }
+
+/* Compact running drawer like the reference UI. */
+.map-left-drawer { top:68px; left:14px; width:250px; max-height:calc(100vh - 84px); border-radius:13px; }
+.map-left-drawer.collapsed { top:68px; width:190px; }
+.running-dropdown-button { padding:9px 10px; min-height:48px; background:rgba(255,255,255,.96); }
+.running-dropdown-icon { width:28px; height:28px; font-size:15px; }
+.running-dropdown-button b { font-size:11px; }
+.running-dropdown-button small { font-size:8px; }
+
+/* TapTrack-like map controls must remain visible on small screens. */
 @media (max-width:700px) {
-  .simple-map-brand { left:8px; top:8px; min-width:160px; }
-  .simple-map-status { right:8px; top:8px; min-width:130px; padding:8px 10px; }
-  .map-left-drawer { top:52px !important; left:8px !important; right:8px !important; width:auto !important; max-height:250px !important; }
-  .watering-alert-stack { top:58px !important; right:8px !important; width:285px !important; max-width:calc(100vw - 16px) !important; }
-  .map-right-drawer { top:315px !important; left:8px !important; right:8px !important; bottom:8px !important; width:auto !important; }
+  .map-only-stage { height:100dvh; min-height:620px; }
+  .map-floating-brand { top:10px; left:10px; min-width:185px; padding:7px 8px; }
+  .map-brand-logo { width:31px; height:31px; }
+  .map-floating-brand b { font-size:12px; }
+  .map-floating-brand small { font-size:8px; }
+  .theme-toggle-map { width:30px; height:30px; }
+  .map-floating-controls { top:10px; right:10px; gap:5px; }
+  .map-running-pill { min-height:34px; padding:0 8px; border-radius:11px; }
+  .map-running-pill small { display:none; }
+  .map-control-btn { width:34px; height:34px; border-radius:10px; }
+  .map-left-drawer { top:55px; left:10px; right:auto; width:180px; max-height:245px; }
+  .map-left-drawer.collapsed { top:55px; width:170px; }
+  .watering-alert-stack { top:58px !important; width:min(340px,calc(100% - 20px)) !important; }
+}
+
+/* Dark mode */
+html[data-theme="dark"] {
+  --bg:#0b1119; --panel:#111923; --ink:#e7edf5; --muted:#9aa9ba; --line:#263342;
+  --accent:#66b8ef; --accent-soft:#163149; --green:#43c998; --green-soft:#12392f;
+  --orange:#f0ad52; --orange-soft:#3a2a17; --danger:#ff8d84; --shadow:0 12px 34px rgba(0,0,0,.34);
+}
+html[data-theme="dark"] .map-floating-brand,
+html[data-theme="dark"] .map-running-pill,
+html[data-theme="dark"] .map-control-btn,
+html[data-theme="dark"] .running-dropdown-button,
+html[data-theme="dark"] .map-left-drawer,
+html[data-theme="dark"] .map-right-drawer {
+  background:rgba(17,25,35,.94); border-color:#2a394a; color:var(--ink);
+}
+html[data-theme="dark"] .map-floating-brand b,
+html[data-theme="dark"] .map-running-pill b,
+html[data-theme="dark"] .running-dropdown-button b { color:#e8eef6; }
+html[data-theme="dark"] .map-floating-brand small,
+html[data-theme="dark"] .map-running-pill small,
+html[data-theme="dark"] .running-dropdown-button small { color:#9aa9ba; }
+html[data-theme="dark"] .theme-toggle-map,
+html[data-theme="dark"] .map-control-btn,
+html[data-theme="dark"] .running-dropdown-button { background:#111923; color:#c8d4e0; border-color:#2b3a4b; }
+html[data-theme="dark"] .map-control-btn:hover,
+html[data-theme="dark"] .theme-toggle-map:hover { background:#172535; }
+html[data-theme="dark"] .watering-alert { background:rgba(17,25,35,.97); border-color:#2d5a4c; }
+html[data-theme="dark"] .watering-alert-body strong { color:#e5edf5; }
+html[data-theme="dark"] .watering-alert-body small,
+html[data-theme="dark"] .watering-code-row > span { color:#9aa9ba; }
+html[data-theme="dark"] .watering-code-row input { background:#0d151f; color:#e8eef6; border-color:#405062; }
+html[data-theme="dark"] .map-train-card { background:#121d28; border-color:#2a3949; color:#e5edf5; }
+html[data-theme="dark"] .map-train-route,
+html[data-theme="dark"] .map-train-meta { color:#86bce0; }
+html[data-theme="dark"] .map-list-footer { background:#101821; border-color:#263342; }
+html[data-theme="dark"] .drawer-route,
+html[data-theme="dark"] .drawer-progress>div:first-child { color:#a6b4c3; }
+html[data-theme="dark"] .drawer-stop b { color:#e7edf5; }
+html[data-theme="dark"] .drawer-tabs>* { border-color:#273544; }
+
+/* Leaflet built-in controls */
+html[data-theme="dark"] .leaflet-control-zoom a,
+html[data-theme="dark"] .leaflet-bar a { background:#111923; color:#d8e2ec; border-color:#2b3a4b; }
+html[data-theme="dark"] .leaflet-control-attribution { background:rgba(17,25,35,.78) !important; color:#aab7c5; }
+
+@media (max-width:430px) {
+  .map-floating-brand { min-width:158px; }
+  .map-floating-brand small { display:none; }
+  .map-running-pill { min-width:38px; justify-content:center; }
+  .map-running-pill b { font-size:11px; }
+  .watering-alert-stack { top:56px !important; }
 }

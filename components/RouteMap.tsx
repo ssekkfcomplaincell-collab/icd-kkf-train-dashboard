@@ -21,18 +21,16 @@ function isExcludedStation(station: StationRow) {
 
 const INDIA_BOUNDS: [[number, number], [number, number]] = [[7.8, 68.0], [37.2, 97.5]];
 
-function FitBounds({ points, selected }: { points: [number, number][], selected: boolean }) {
+function FitBounds({ points, allPoints, selected, fitToken }: { points: [number, number][]; allPoints: [number, number][]; selected: boolean; fitToken: number }) {
   const map = useMap();
   useEffect(() => {
-    if (points.length) {
-      // When no train is selected, frame only the stations/current positions
-      // of trains that are running now. This keeps the map close to the
-      // operational area instead of showing the whole country.
-      map.fitBounds(points, { padding: selected ? [45, 45] : [70, 70], maxZoom: selected ? 8 : 7.5 });
+    const target = fitToken > 0 && allPoints.length ? allPoints : points;
+    if (target.length) {
+      map.fitBounds(target, { padding: selected && fitToken === 0 ? [45, 45] : [70, 70], maxZoom: selected && fitToken === 0 ? 8 : 7.5 });
       return;
     }
     map.fitBounds(INDIA_BOUNDS, { padding: [12, 12], maxZoom: 5.6 });
-  }, [map, points, selected]);
+  }, [map, points, allPoints, selected, fitToken]);
   return null;
 }
 
@@ -81,10 +79,16 @@ export default function RouteMap({
   instances,
   selectedKey,
   onTrainClick,
+  hideAll = false,
+  fitAllToken = 0,
+  theme = "light",
 }: {
   instances: MapTrainInstance[];
   selectedKey: string;
   onTrainClick: (key: string) => void;
+  hideAll?: boolean;
+  fitAllToken?: number;
+  theme?: "light" | "dark";
 }) {
   const routes = useMemo(() => instances.map((instance, index) => {
     const points = instance.stations
@@ -158,26 +162,25 @@ export default function RouteMap({
       scrollWheelZoom
       className="leaflet-map"
     >
-      <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <FitBounds points={mapFitPoints} selected={Boolean(selectedRoute)} />
+      <TileLayer
+        attribution={theme === "dark" ? '&copy; OpenStreetMap contributors &copy; CARTO' : '&copy; OpenStreetMap contributors'}
+        url={theme === "dark" ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"}
+      />
+      <FitBounds points={mapFitPoints} allPoints={runningPoints} selected={Boolean(selectedRoute)} fitToken={fitAllToken} />
       {routes.map((route) => <Fragment key={route.instance.key}>
         {route.instance.key === selectedKey && route.solid.map((line, i) => <Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 6, opacity: 0.95 }} />)}
         {route.instance.key === selectedKey && route.dotted.map((line, i) => <Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 5, opacity: 0.8, dashArray: "7 9" }} />)}
-        {(() => {
+        {route.points.length > 0 && (() => {
           const routeStations = route.instance.stations
             .filter((s) => !isExcludedStation(s))
             .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
-          const currentStation = routeStations.find((s) =>
-            s.stationName.trim().toLowerCase() === route.instance.currentStationName.trim().toLowerCase()
-            || s.stationCode.trim().toLowerCase() === route.instance.currentStationName.trim().toLowerCase()
-          );
+          const currentStation = routeStations.find((s) => s.stationName === route.instance.currentStationName);
           const markerPosition = currentStation
             ? [currentStation.latitude as number, currentStation.longitude as number] as [number, number]
             : route.current || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))];
-          if (!markerPosition || !Number.isFinite(markerPosition[0]) || !Number.isFinite(markerPosition[1])) return null;
           const nextWatering = nextWateringStation(route.instance.stations, route.instance.currentStationName);
           const isSelected = route.instance.key === selectedKey;
-          const isVisible = !selectedKey || isSelected;
+          const isVisible = !hideAll && (!selectedKey || isSelected);
           if (!isVisible) return null;
           return <Marker
             position={markerPosition}

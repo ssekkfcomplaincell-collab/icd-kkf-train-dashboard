@@ -213,3 +213,8 @@ html[data-theme="dark"] .today-status.depart { background:#3a2b17; color:#f0ad52
   .today-train-list { max-height:185px; }
   .watering-alert-stack { top:92px !important; left:10px !important; right:10px !important; width:auto !important; }
 }
+
+
+/* Today's Train departure date */
+.today-train-dep { margin-top:4px; color:var(--muted); font-size:8px; font-weight:700; }
+.today-train-item .today-train-dep { letter-spacing:.01em; }

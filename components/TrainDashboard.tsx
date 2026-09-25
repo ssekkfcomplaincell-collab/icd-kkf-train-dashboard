@@ -118,6 +118,7 @@ export default function TrainDashboard() {
   const [lastRefresh, setLastRefresh] = useState("");
   const [now, setNow] = useState(new Date());
   const [wateringCodes, setWateringCodes] = useState<Record<string, string>>({});
+  const [wateringDismissed, setWateringDismissed] = useState<Record<string, boolean>>({});
   const [wateringInputs, setWateringInputs] = useState<Record<string, string>>({});
   const [showRunningList, setShowRunningList] = useState(false);
   const [showTodayTrainList, setShowTodayTrainList] = useState(false);
@@ -247,10 +248,11 @@ export default function TrainDashboard() {
         }
       }
     }
-    const visibleAlerts = selectedKey
-      ? alerts.filter((alert) => alert.key.startsWith(`${selectedKey}-`))
-      : alerts;
-    return visibleAlerts.sort((a, b) => a.minutes - b.minutes);
+    const visibleAlerts = alerts.filter((alert) => !wateringDismissed[alert.key]);
+    const selectedVisible = selectedKey
+      ? visibleAlerts.filter((alert) => alert.key.startsWith(`${selectedKey}-`))
+      : visibleAlerts;
+    return selectedVisible.sort((a, b) => a.minutes - b.minutes);
   }, [runningNowInstances, now, selectedKey]);
 
 
@@ -297,7 +299,7 @@ export default function TrainDashboard() {
                 <div className="watering-code-row">
                   <span>CODE <b>{code}</b></span>
                   <input value={input} maxLength={3} inputMode="numeric" placeholder="Enter" onChange={(e) => { const value = e.target.value.replace(/\D/g, "").slice(0, 3); setWateringInputs((v) => { const next = { ...v, [alert.key]: value }; try { window.localStorage.setItem("icd-kkf-watering-inputs-v1", JSON.stringify(next)); } catch {} return next; }); }} />
-                  <button disabled={!solved} title={solved ? "Code verified — alert remains until the watering station time" : "Enter the correct code"}>✓</button>
+                  <button disabled={!solved} title={solved ? "Code verified — close alert" : "Enter the correct code"} onClick={() => { if (solved) setWateringDismissed((v) => ({ ...v, [alert.key]: true })); }}>✓</button>
                 </div>
               </div>
               <button className="watering-alert-arrow" title="Open train route" onClick={() => setSelectedKey(`${alert.trainNo}-${dateKey(alert.departureDate)}`)}>›</button>
@@ -373,6 +375,7 @@ export default function TrainDashboard() {
                   return <button key={inst.key} className="today-train-item" onClick={() => inst.status === "RUNNING NOW" && setSelectedKey(inst.key)} disabled={inst.status !== "RUNNING NOW"}>
                     <div className="today-train-item-top"><b>{inst.train.trainNo}</b><span className={`today-status ${statusClass}`}>{statusText}</span></div>
                     <div className="today-train-route">{first?.stationCode || "—"} → {last?.stationCode || "—"}</div>
+                    <div className="today-train-dep">Dep {inst.departureDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div>
                   </button>;
                 })}
                 {!todaysTrainInstances.length && <div className="empty">No trains for today.</div>}

@@ -23,7 +23,24 @@ function todayInfo() {
   const now = new Date();
   return { date: now.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }), day: WEEKDAYS[(now.getDay() + 6) % 7] };
 }
-function wateringClass(value: string) { const v = value.toUpperCase(); if (v.includes("S/W")) return "sw"; if (v.includes("O/D")) return "od"; return ""; }
+function normalizeWatering(value: string) {
+  return String(value || "").toUpperCase().replace(/\s+/g, "").replace(/[\u2013\u2014-]/g, "/");
+}
+function wateringClass(value: string) { const v = normalizeWatering(value); if (v.includes("S/W")) return "sw"; if (v.includes("O/D")) return "od"; return ""; }
+function isWateringStation(station: StationRow, trainNo: string) {
+  const value = normalizeWatering(station.watering);
+  // Keep the Google Sheet as the primary source. This small compatibility
+  // fallback covers 19435/PNBE because PNBE is a configured watering point
+  // for this train even when the published CSV row loses the watering cell.
+  return Boolean(value.includes("S/W") || value.includes("O/D") || (trainNo === "19435" && station.stationCode.toUpperCase() === "PNBE"));
+}
+function wateringType(station: StationRow, trainNo: string) {
+  const value = normalizeWatering(station.watering);
+  if (value.includes("S/W")) return "S/W";
+  if (value.includes("O/D")) return "O/D";
+  if (trainNo === "19435" && station.stationCode.toUpperCase() === "PNBE") return "S/W";
+  return station.watering;
+}
 function firstTime(stations: StationRow[], field: "arrival" | "departure") { return stations.find((s) => /^\d{1,2}:\d{2}$/.test(s[field]))?.[field] || "—"; }
 function isExcludedStation(s: StationRow) {
   const text = `${s.stationCode} ${s.stationName} ${s.trainNo} ${s.section} ${s.watering} ${s.arrival} ${s.departure}`.toLowerCase();
@@ -228,7 +245,7 @@ export default function TrainDashboard() {
         // Do not generate a watering popup for the final destination station.
         // Watering alerts are intended only for intermediate watering points.
         if (i === routeStations.length - 1) continue;
-        if (!station.watering) continue;
+        if (!isWateringStation(station, inst.train.trainNo)) continue;
         // Use the next actual timetable event at the watering station.
         // Prefer arrival when it is still upcoming; if arrival has already
         // passed but departure is still upcoming, use departure. This prevents
@@ -291,7 +308,7 @@ export default function TrainDashboard() {
               <div className="watering-alert-body">
                 <b>WATERING POINT IN {alert.minutes} MIN</b>
                 <strong>{alert.trainNo} • {alert.station.stationCode}</strong>
-                <small>{alert.station.stationName} • {alert.station.watering}</small>
+                <small>{alert.station.stationName} • {wateringType(alert.station, alert.trainNo)}</small>
                 <div className="watering-code-row">
                   <span>CODE <b>{code}</b></span>
                   <input value={input} maxLength={3} inputMode="numeric" placeholder="Enter" onChange={(e) => setWateringInputs((v) => ({ ...v, [alert.key]: e.target.value.replace(/\D/g, "").slice(0, 3) }))} />

@@ -4,6 +4,8 @@ import { StationRow, Train, Weekday } from "./types";
 const SCHEDULE_SPREADSHEET_ID = "1HBFYHFkf7P5yZ2dC76FkZF5Pfe-QVtilDDFW6nTdE";
 const SCHEDULE_GID = "1463153132";
 const DEFAULT_SCHEDULE_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQXHb-McVF62fJFt1CDecykHzBwhmXnG9NrUTOyn1-iZIg2NFBZ6YySnxgwihcdvFLvMPXDk3WZ0g7z/pub?gid=1463153132&single=true&output=csv";
+const GVIZ_SCHEDULE_CSV_URL =
   `https://docs.google.com/spreadsheets/d/${SCHEDULE_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=${SCHEDULE_GID}`;
 
 const SPREADSHEET_ID = "1HBFYHFkf7Pq5YdZ2zC76FkZF5Pfe-QVtilDDFW6nTdE";
@@ -43,20 +45,34 @@ function isYes(value: unknown): boolean {
 async function fetchCsv(url: string): Promise<Record<string, unknown>[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
-  let response: Response;
   try {
-    response = await fetch(url, {
-    next: { revalidate: 60 },
-    headers: { "User-Agent": "ICD-KKF-Train-Dashboard/1.0" },
-      signal: controller.signal
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: { "User-Agent": "ICD-KKF-Train-Dashboard/1.0" },
+      signal: controller.signal,
     });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const csv = await response.text();
+    const parsed = Papa.parse<Record<string, unknown>>(csv, { header: true, skipEmptyLines: true });
+    if (parsed.errors.length) {
+      throw new Error(parsed.errors[0]?.message || "Invalid CSV");
+    }
+    return parsed.data;
   } finally {
     clearTimeout(timeout);
   }
-  if (!response.ok) throw new Error(`Google Sheet fetch failed: ${response.status}`);
-  const csv = await response.text();
-  const parsed = Papa.parse<Record<string, unknown>>(csv, { header: true, skipEmptyLines: true });
-  return parsed.data;
+}
+
+async function fetchCsvWithFallback(urls: string[]): Promise<Record<string, unknown>[]> {
+  const errors: string[] = [];
+  for (const url of [...new Set(urls.filter(Boolean))]) {
+    try {
+      return await fetchCsv(url);
+    } catch (error) {
+      errors.push(`${url} -> ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  throw new Error(`Google Sheet fetch failed. Tried ${errors.length} source(s). ${errors.join(" | ")}`);
 }
 
 function isExcludedRow(row: Record<string, unknown>) {
@@ -65,12 +81,25 @@ function isExcludedRow(row: Record<string, unknown>) {
 }
 
 async function fetchAndBuildTrainData(): Promise<Train[]> {
-  const scheduleUrl = process.env.GOOGLE_SHEET_CSV_URL || DEFAULT_SCHEDULE_CSV_URL;
-  const coordinateUrl = process.env.GOOGLE_COORDINATES_CSV_URL || DEFAULT_COORDINATES_CSV_URL;
+  const configuredScheduleUrl = (process.env.GOOGLE_SHEET_CSV_URL || "").trim();
+  const configuredCoordinateUrl = (process.env.GOOGLE_COORDINATES_CSV_URL || "").trim();
+
+  // The published CSV is the primary source. If Vercel has an old/broken
+  // GOOGLE_SHEET_CSV_URL environment variable, automatically fall back instead
+  // of failing the entire dashboard with HTTP 404.
+  const scheduleRowsPromise = fetchCsvWithFallback([
+    configuredScheduleUrl,
+    DEFAULT_SCHEDULE_CSV_URL,
+    GVIZ_SCHEDULE_CSV_URL,
+  ]);
+  const coordinateRowsPromise = fetchCsvWithFallback([
+    configuredCoordinateUrl,
+    DEFAULT_COORDINATES_CSV_URL,
+  ]).catch(() => [] as Record<string, unknown>[]);
 
   const [scheduleRows, coordinateRows] = await Promise.all([
-    fetchCsv(scheduleUrl),
-    fetchCsv(coordinateUrl).catch(() => [] as Record<string, unknown>[])
+    scheduleRowsPromise,
+    coordinateRowsPromise,
   ]);
 
   const coordinates = new Map<string, { latitude: number; longitude: number }>();

@@ -136,10 +136,9 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .watering-code-row button { width:25px; height:24px; border:0; border-radius:6px; background:#16a36f; color:white; font-weight:800; cursor:pointer; }
 .watering-code-row button:disabled { background:#cbd5d1; cursor:not-allowed; }
 
-
 @keyframes wateringPulse { 0%,100% { box-shadow:0 10px 28px rgba(15,23,42,.18); } 50% { box-shadow:0 10px 28px rgba(22,163,111,.28), 0 0 0 3px rgba(22,163,111,.08); } }
 @media (max-width:1100px) { .watering-alert-stack { right:14px; top:300px; width:285px; } }
-@media (max-width:700px) { .watering-alert-stack { left:auto; right:10px; top:10px; width:285px; } }
+@media (max-width:700px) { .watering-alert-stack { left:10px; right:10px; top:255px; width:auto; } }
 
 /* Map-only dashboard layout */
 .map-only-page { max-width:none; width:100%; min-height:100vh; padding:14px; }
@@ -165,171 +164,52 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 }
 
 
-/* =========================================================
-   ICD / KKF — compact TapTrack-style floating map UI
-   ========================================================= */
-.map-only-page { position:relative; max-width:none; width:100%; min-height:100vh; padding:0; background:var(--bg); }
-.map-only-panel { margin:0; border:0; border-radius:0; box-shadow:none; background:var(--panel); }
-.map-only-stage { height:100vh; min-height:620px; position:relative; }
-.taptrack-map-stage .real-map { height:100%; border-radius:0; }
-
-.map-floating-brand {
-  position:absolute; z-index:1300; top:14px; left:14px; min-width:255px;
-  display:flex; align-items:center; gap:10px; padding:9px 10px;
-  background:rgba(255,255,255,.96); border:1px solid rgba(215,224,233,.95);
-  border-radius:14px; box-shadow:0 8px 26px rgba(15,23,42,.13); backdrop-filter:blur(10px);
+/* Final TODAY'S TRAIN + watering alert positioning */
+.today-train-drawer {
+  position:absolute;
+  z-index:1300;
+  top:14px;
+  right:14px;
+  width:275px;
+  max-height:calc(100% - 28px);
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.97);
+  border-radius:11px;
+  box-shadow:0 10px 28px rgba(15,23,42,.18);
+  overflow:hidden;
 }
-.map-brand-logo { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; background:#eef6fb; font-size:17px; }
-.map-floating-brand b { display:block; font-size:13px; letter-spacing:.01em; color:#18283a; }
-.map-floating-brand small { display:block; margin-top:2px; color:#748294; font-size:9px; }
-.theme-toggle-map { margin-left:auto; width:32px; height:32px; border:1px solid #dbe4ec; border-radius:9px; background:#f8fafc; color:#334155; cursor:pointer; font-size:17px; display:grid; place-items:center; }
-.theme-toggle-map:hover,.map-control-btn:hover { background:#eef5fa; border-color:#c4d7e6; }
+html[data-theme="dark"] .today-train-drawer { background:rgba(17,27,43,.97); }
+.today-train-collapsed { width:100%; border:0; background:transparent; padding:10px 12px; display:flex; align-items:center; gap:8px; text-align:left; cursor:pointer; color:var(--ink); }
+.today-train-icon { width:27px; height:27px; display:grid; place-items:center; border-radius:7px; background:var(--accent-soft); }
+.today-train-collapsed > span:nth-child(2) { min-width:0; flex:1; display:flex; flex-direction:column; gap:1px; }
+.today-train-collapsed b { font-size:10px; letter-spacing:.04em; }
+.today-train-collapsed small { color:var(--muted); font-size:8px; }
+.today-train-chevron { color:var(--muted); font-size:15px; }
+.today-train-head { display:flex; align-items:center; justify-content:space-between; padding:9px 11px; border-bottom:1px solid var(--line); }
+.today-train-head > div { display:flex; flex-direction:column; gap:2px; }
+.today-train-head b { font-size:10px; }
+.today-train-head small { font-size:8px; color:var(--muted); }
+.today-train-head button { width:24px; height:24px; border:1px solid var(--line); border-radius:6px; background:transparent; color:var(--ink); cursor:pointer; font-size:16px; }
+.today-train-list { max-height:340px; overflow:auto; padding:5px; }
+.today-train-item { width:100%; border:0; border-bottom:1px solid var(--line); background:transparent; padding:8px 7px; text-align:left; color:var(--ink); cursor:pointer; }
+.today-train-item:disabled { cursor:default; opacity:.95; }
+.today-train-item:last-child { border-bottom:0; }
+.today-train-item-top { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.today-train-item-top > b { font-size:11px; }
+.today-train-route { margin-top:3px; color:var(--muted); font-size:8px; }
+.today-status { border-radius:999px; padding:3px 5px; font-size:7px; font-weight:800; letter-spacing:.02em; white-space:nowrap; }
+.today-status.running { background:#dff7eb; color:#0d8158; }
+.today-status.completed { background:#e8edf2; color:#536272; }
+.today-status.depart { background:#fff0d9; color:#9a5a00; }
+html[data-theme="dark"] .today-status.running { background:#123a30; color:#43c996; }
+html[data-theme="dark"] .today-status.completed { background:#26364a; color:#b9c7d7; }
+html[data-theme="dark"] .today-status.depart { background:#3a2b17; color:#f0ad52; }
 
-.map-floating-controls { position:absolute; z-index:1300; top:14px; right:14px; display:flex; align-items:center; gap:7px; }
-.map-running-pill { min-height:38px; display:flex; align-items:center; gap:6px; padding:0 12px; background:rgba(255,255,255,.96); border:1px solid rgba(215,224,233,.95); border-radius:13px; box-shadow:0 8px 26px rgba(15,23,42,.13); backdrop-filter:blur(10px); }
-.map-running-pill b { font-size:13px; color:#1f3042; }
-.map-running-pill small { font-size:9px; color:#6f7e8f; font-weight:700; }
-.map-control-btn { width:38px; height:38px; border:1px solid #d7e0e9; border-radius:11px; background:rgba(255,255,255,.96); color:#53667a; box-shadow:0 8px 26px rgba(15,23,42,.13); cursor:pointer; font-size:18px; font-weight:800; display:grid; place-items:center; backdrop-filter:blur(10px); }
-.map-control-btn.fit { font-size:20px; }
-.map-control-btn.active { background:#eaf4fb; color:#1769aa; border-color:#a9cce5; }
-.map-error { position:absolute; z-index:1600; top:62px; left:50%; transform:translateX(-50%); width:min(700px,calc(100% - 28px)); margin:0; }
-
-/* Keep watering alert centered and identical on desktop + mobile. */
-.watering-alert-stack { left:50% !important; right:auto !important; top:78px !important; transform:translateX(-50%); width:min(360px,calc(100% - 24px)) !important; }
-.watering-alert { min-height:72px; }
-.watering-alert-body { flex:1 1 auto; }
-
-/* Compact running drawer like the reference UI. */
-.map-left-drawer { top:68px; left:14px; width:250px; max-height:calc(100vh - 84px); border-radius:13px; }
-.map-left-drawer.collapsed { top:68px; width:190px; }
-.running-dropdown-button { padding:9px 10px; min-height:48px; background:rgba(255,255,255,.96); }
-.running-dropdown-icon { width:28px; height:28px; font-size:15px; }
-.running-dropdown-button b { font-size:11px; }
-.running-dropdown-button small { font-size:8px; }
-
-/* TapTrack-like map controls must remain visible on small screens. */
-@media (max-width:700px) {
-  .map-only-stage { height:100dvh; min-height:620px; }
-  .map-floating-brand { top:10px; left:10px; min-width:185px; padding:7px 8px; }
-  .map-brand-logo { width:31px; height:31px; }
-  .map-floating-brand b { font-size:12px; }
-  .map-floating-brand small { font-size:8px; }
-  .theme-toggle-map { width:30px; height:30px; }
-  .map-floating-controls { top:10px; right:10px; gap:5px; }
-  .map-running-pill { min-height:34px; padding:0 8px; border-radius:11px; }
-  .map-running-pill small { display:none; }
-  .map-control-btn { width:34px; height:34px; border-radius:10px; }
-  .map-left-drawer { top:55px; left:10px; right:auto; width:180px; max-height:245px; }
-  .map-left-drawer.collapsed { top:55px; width:170px; }
-  .watering-alert-stack { top:58px !important; width:min(340px,calc(100% - 20px)) !important; }
-}
-
-/* Dark mode */
-html[data-theme="dark"] {
-  --bg:#0b1119; --panel:#111923; --ink:#e7edf5; --muted:#9aa9ba; --line:#263342;
-  --accent:#66b8ef; --accent-soft:#163149; --green:#43c998; --green-soft:#12392f;
-  --orange:#f0ad52; --orange-soft:#3a2a17; --danger:#ff8d84; --shadow:0 12px 34px rgba(0,0,0,.34);
-}
-html[data-theme="dark"] .map-floating-brand,
-html[data-theme="dark"] .map-running-pill,
-html[data-theme="dark"] .map-control-btn,
-html[data-theme="dark"] .running-dropdown-button,
-html[data-theme="dark"] .map-left-drawer,
-html[data-theme="dark"] .map-right-drawer {
-  background:rgba(17,25,35,.94); border-color:#2a394a; color:var(--ink);
-}
-html[data-theme="dark"] .map-floating-brand b,
-html[data-theme="dark"] .map-running-pill b,
-html[data-theme="dark"] .running-dropdown-button b { color:#e8eef6; }
-html[data-theme="dark"] .map-floating-brand small,
-html[data-theme="dark"] .map-running-pill small,
-html[data-theme="dark"] .running-dropdown-button small { color:#9aa9ba; }
-html[data-theme="dark"] .theme-toggle-map,
-html[data-theme="dark"] .map-control-btn,
-html[data-theme="dark"] .running-dropdown-button { background:#111923; color:#c8d4e0; border-color:#2b3a4b; }
-html[data-theme="dark"] .map-control-btn:hover,
-html[data-theme="dark"] .theme-toggle-map:hover { background:#172535; }
-html[data-theme="dark"] .watering-alert { background:rgba(17,25,35,.97); border-color:#2d5a4c; }
-html[data-theme="dark"] .watering-alert-body strong { color:#e5edf5; }
-html[data-theme="dark"] .watering-alert-body small,
-html[data-theme="dark"] .watering-code-row > span { color:#9aa9ba; }
-html[data-theme="dark"] .watering-code-row input { background:#0d151f; color:#e8eef6; border-color:#405062; }
-html[data-theme="dark"] .map-train-card { background:#121d28; border-color:#2a3949; color:#e5edf5; }
-html[data-theme="dark"] .map-train-route,
-html[data-theme="dark"] .map-train-meta { color:#86bce0; }
-html[data-theme="dark"] .map-list-footer { background:#101821; border-color:#263342; }
-html[data-theme="dark"] .drawer-route,
-html[data-theme="dark"] .drawer-progress>div:first-child { color:#a6b4c3; }
-html[data-theme="dark"] .drawer-stop b { color:#e7edf5; }
-html[data-theme="dark"] .drawer-tabs>* { border-color:#273544; }
-
-/* Leaflet built-in controls */
-html[data-theme="dark"] .leaflet-control-zoom a,
-html[data-theme="dark"] .leaflet-bar a { background:#111923; color:#d8e2ec; border-color:#2b3a4b; }
-html[data-theme="dark"] .leaflet-control-attribution { background:rgba(17,25,35,.78) !important; color:#aab7c5; }
-
-@media (max-width:430px) {
-  .map-floating-brand { min-width:158px; }
-  .map-floating-brand small { display:none; }
-  .map-running-pill { min-width:38px; justify-content:center; }
-  .map-running-pill b { font-size:11px; }
-  .watering-alert-stack { top:56px !important; }
-}
-
-/* Today's trains drawer: collapsed by default, expandable on demand. */
-.map-today-drawer {
-  position:absolute; z-index:1290; left:14px; top:122px; width:250px;
-  max-height:calc(100vh - 138px); overflow:hidden;
-  background:rgba(255,255,255,.96); border:1px solid rgba(215,224,233,.95);
-  border-radius:13px; box-shadow:0 8px 26px rgba(15,23,42,.13); backdrop-filter:blur(10px);
-}
-.map-today-drawer.collapsed { width:190px; }
-.today-dropdown-button {
-  width:100%; min-height:48px; display:flex; align-items:center; gap:9px; padding:9px 10px;
-  border:0; background:transparent; color:#1d3042; cursor:pointer; text-align:left;
-}
-.today-dropdown-icon { width:28px; height:28px; display:grid; place-items:center; border-radius:9px; background:#eef6fb; font-size:15px; flex:0 0 auto; }
-.today-dropdown-button span:nth-child(2) { flex:1; min-width:0; }
-.today-dropdown-button b { display:block; font-size:11px; letter-spacing:.02em; }
-.today-dropdown-button small { display:block; margin-top:2px; color:#738294; font-size:8px; }
-.today-brand { min-height:48px; }
-.today-status-list { max-height:calc(100vh - 225px); overflow:auto; padding:7px; }
-.today-status-card {
-  display:block; width:100%; border:1px solid var(--line); background:#fbfdff; border-radius:9px;
-  padding:9px; margin-bottom:6px; text-align:left; cursor:pointer; color:inherit;
-}
-.today-status-card:hover { border-color:#9bc4df; background:#fff; }
-.today-status-head { display:flex; align-items:center; justify-content:space-between; gap:7px; }
-.today-status-head>b { font-size:12px; }
-.today-status { font-size:7px; font-weight:900; letter-spacing:.04em; padding:3px 5px; border-radius:5px; white-space:nowrap; }
-.today-status.running { color:#0c7c56; background:#e4f6ee; }
-.today-status.completed { color:#64707d; background:#edf0f3; }
-.today-status.depart { color:#9a6500; background:#fff1d6; }
-.today-status-route { margin-top:6px; font-size:9px; font-weight:800; color:#466075; }
-.today-status-route span { color:var(--accent); padding:0 3px; }
-.today-status-meta { margin-top:4px; font-size:8px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.today-status-meta span { color:#7890a3; }
-.today-footer-close { border:0; background:none; color:var(--accent); font-size:8px; font-weight:800; cursor:pointer; padding:0; }
-
-/* Mild mobile-night effect on the same OpenStreetMap tiles; no CARTO/API key required. */
-.taptrack-map.map-night .leaflet-tile-pane { filter: brightness(.66) contrast(.92) saturate(.82); }
-.taptrack-map.map-night .leaflet-overlay-pane { filter:none; }
-
-html[data-theme="dark"] .map-today-drawer { background:rgba(17,25,35,.95); border-color:#2a394a; color:#e7edf5; }
-html[data-theme="dark"] .today-dropdown-button { color:#e7edf5; }
-html[data-theme="dark"] .today-dropdown-icon { background:#182b3a; }
-html[data-theme="dark"] .today-dropdown-button small { color:#9aa9ba; }
-html[data-theme="dark"] .today-status-card { background:#121d28; border-color:#2a3949; color:#e5edf5; }
-html[data-theme="dark"] .today-status-card:hover { background:#162330; border-color:#3b5970; }
-html[data-theme="dark"] .today-status-route { color:#9bb7ca; }
-html[data-theme="dark"] .today-status-meta { color:#9aa9ba; }
-html[data-theme="dark"] .today-status.running { color:#57d3a4; background:#12392f; }
-html[data-theme="dark"] .today-status.completed { color:#b5c0cb; background:#26313b; }
-html[data-theme="dark"] .today-status.depart { color:#f0bd67; background:#3a2d18; }
+/* Keep watering alerts visible beside the right-side TODAY'S TRAIN box. */
+.watering-alert-stack { top:14px !important; right:305px !important; left:auto !important; width:300px !important; }
 
 @media (max-width:700px) {
-  .map-today-drawer { top:110px; left:10px; width:180px; max-height:calc(100dvh - 122px); }
-  .map-today-drawer.collapsed { width:170px; }
-  .today-status-list { max-height:calc(100dvh - 208px); }
-  .taptrack-map.map-night .leaflet-tile-pane { filter: brightness(.69) contrast(.93) saturate(.85); }
+  .today-train-drawer { top:10px; right:10px; width:215px; max-height:235px; }
+  .today-train-list { max-height:185px; }
+  .watering-alert-stack { top:92px !important; left:10px !important; right:10px !important; width:auto !important; }
 }

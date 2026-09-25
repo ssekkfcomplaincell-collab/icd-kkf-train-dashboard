@@ -190,7 +190,6 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .map-running-pill b { font-size:13px; color:#1f3042; }
 .map-running-pill small { font-size:9px; color:#6f7e8f; font-weight:700; }
 .map-control-btn { width:38px; height:38px; border:1px solid #d7e0e9; border-radius:11px; background:rgba(255,255,255,.96); color:#53667a; box-shadow:0 8px 26px rgba(15,23,42,.13); cursor:pointer; font-size:18px; font-weight:800; display:grid; place-items:center; backdrop-filter:blur(10px); }
-.map-control-btn.fit { font-size:20px; }
 .map-control-btn.active { background:#eaf4fb; color:#1769aa; border-color:#a9cce5; }
 .map-error { position:absolute; z-index:1600; top:62px; left:50%; transform:translateX(-50%); width:min(700px,calc(100% - 28px)); margin:0; }
 
@@ -274,4 +273,41 @@ html[data-theme="dark"] .leaflet-control-attribution { background:rgba(17,25,35,
   .map-running-pill { min-width:38px; justify-content:center; }
   .map-running-pill b { font-size:11px; }
   .watering-alert-stack { top:56px !important; }
+}
+
+/* ICD / KKF left-side stacked Running + Today's Train panels */
+.map-left-stack {
+  position:absolute; z-index:1300; top:68px; left:14px; width:250px;
+  display:flex; flex-direction:column; gap:8px; max-height:calc(100vh - 84px);
+}
+.map-left-stack .map-left-drawer,
+.map-left-stack .today-left-drawer { position:relative; top:auto; left:auto; width:100%; max-height:none; }
+.today-left-drawer { overflow:hidden; border-radius:13px; background:rgba(255,255,255,.96); border:1px solid rgba(215,224,233,.95); box-shadow:0 8px 26px rgba(15,23,42,.13); backdrop-filter:blur(10px); }
+.today-dropdown-button { width:100%; min-height:48px; border:0; background:transparent; display:flex; align-items:center; gap:9px; padding:9px 10px; cursor:pointer; text-align:left; color:#1c2b3b; }
+.today-dropdown-button b { display:block; font-size:11px; }
+.today-dropdown-button small { display:block; margin-top:2px; color:#748294; font-size:8px; }
+.today-train-list { max-height:290px; overflow:auto; padding:6px 7px 8px; border-top:1px solid #e3eaf0; }
+.today-list-card { width:100%; margin:3px 0; padding:8px 9px; border:1px solid #dbe4ec; background:#fbfdff; border-radius:9px; cursor:pointer; text-align:left; }
+.today-list-card:hover { border-color:#a9cce5; }
+.today-list-card.running { box-shadow:inset 3px 0 0 #1aa57a; }
+.today-list-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.today-list-head b { font-size:12px; }
+.today-list-head span { font-size:7px; color:#0d8b68; font-weight:800; }
+.today-list-route { margin-top:5px; font-size:9px; font-weight:800; color:#42627c; }
+.today-list-route i { font-style:normal; margin:0 4px; color:#1d8ac0; }
+.today-list-meta { margin-top:4px; font-size:7px; color:#7a8998; }
+html[data-theme="dark"] .today-left-drawer { background:rgba(17,25,35,.94); border-color:#2a394a; }
+html[data-theme="dark"] .today-dropdown-button { color:#e8eef6; }
+html[data-theme="dark"] .today-dropdown-button small { color:#9aa9ba; }
+html[data-theme="dark"] .today-train-list { border-color:#273544; }
+html[data-theme="dark"] .today-list-card { background:#121d28; border-color:#2a3949; color:#e5edf5; }
+html[data-theme="dark"] .today-list-route { color:#86bce0; }
+html[data-theme="dark"] .today-list-meta { color:#93a3b4; }
+html[data-theme="dark"] .leaflet-tile-pane { filter:brightness(.52) contrast(1.08) saturate(.78); }
+@media (max-width:700px) {
+  .map-left-stack { top:55px; left:10px; width:180px; max-height:calc(100dvh - 70px); }
+  .today-train-list { max-height:230px; }
+}
+@media (max-width:430px) {
+  .map-left-stack { width:170px; }
 }

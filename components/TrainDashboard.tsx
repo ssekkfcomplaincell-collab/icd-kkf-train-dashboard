@@ -94,7 +94,7 @@ export default function TrainDashboard() {
   const [search, setSearch] = useState("");
   const [stationSearch, setStationSearch] = useState("");
   const [wateringFilter, setWateringFilter] = useState("ALL");
-  const [todayOnly, setTodayOnly] = useState(true);
+  const [showTodayList, setShowTodayList] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState("");
@@ -105,8 +105,6 @@ export default function TrainDashboard() {
   const [wateringInputs, setWateringInputs] = useState<Record<string, string>>({});
   const [showRunningList, setShowRunningList] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [hideAll, setHideAll] = useState(false);
-  const [fitAllToken, setFitAllToken] = useState(0);
 
   async function load(options: { silent?: boolean; force?: boolean } = {}) {
     const { silent = false, force = false } = options;
@@ -181,7 +179,8 @@ export default function TrainDashboard() {
   const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);
   const todaysInstances = runningNowInstances;
   const mapInstances = useMemo(() => runningNowInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent, currentStationName: inst.currentStation })), [todaysInstances]);
-  const baseTrains = todayOnly ? trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0) : trains;
+  const baseTrains = trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0);
+  const todaysScheduledTrains = useMemo(() => trains.filter((t) => t.runningDays?.[todayDay]), [trains, todayDay]);
 
   const filteredTrains = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -278,9 +277,7 @@ export default function TrainDashboard() {
 
         <div className="map-floating-controls">
           <div className="map-running-pill"><span className="map-live-dot" /> <b>{todaysInstances.length}</b><small>trains running</small></div>
-          <button className="map-control-btn" onClick={() => void load({ silent: true, force: true })} title="Refresh">↻</button>
-          <button className="map-control-btn fit" onClick={() => setFitAllToken((v) => v + 1)} title="Fit all running trains">⌗</button>
-          <button className={`map-control-btn ${hideAll ? "active" : ""}`} onClick={() => setHideAll((v) => !v)} title={hideAll ? "Show all trains" : "Hide all train labels"}>{hideAll ? "◉" : "◉̸"}</button>
+          <button className="map-control-btn" onClick={() => window.location.reload()} title="Refresh">↻</button>
         </div>
         {wateringAlerts.length > 0 && <div className="watering-alert-stack" aria-live="polite">
           {wateringAlerts.map((alert) => {
@@ -299,13 +296,14 @@ export default function TrainDashboard() {
                   <button disabled={!solved} onClick={() => setWateringDismissed((v) => ({ ...v, [alert.key]: true }))}>✓</button>
                 </div>
               </div>
-              <button className="watering-alert-arrow" title="Open train route" onClick={() => { setFitAllToken(0); setSelectedKey(`${alert.trainNo}-${dateKey(alert.departureDate)}`); }}>›</button>
+              <button className="watering-alert-arrow" title="Open train route" onClick={() => { setSelectedKey(`${alert.trainNo}-${dateKey(alert.departureDate)}`); }}>›</button>
             </div>;
           })}
         </div>}
 
-        {runningNowInstances.length ? <RouteMap instances={mapInstances} selectedKey={selectedInstance?.key || ""} onTrainClick={(key) => { setFitAllToken(0); setSelectedKey(key); }} hideAll={hideAll} fitAllToken={fitAllToken} theme={theme} /> : <div className="real-map map-loading">No train is running at the current scheduled time.</div>}
+        {runningNowInstances.length ? <RouteMap instances={mapInstances} selectedKey={selectedInstance?.key || ""} onTrainClick={(key) => { setSelectedKey(key); }} /> : <div className="real-map map-loading">No train is running at the current scheduled time.</div>}
 
+        <div className="map-left-stack">
         <aside className={`map-left-drawer ${showRunningList ? "open" : "collapsed"}`}>
           {!showRunningList ? (
             <button className="running-dropdown-button" onClick={() => setShowRunningList(true)} aria-expanded="false">
@@ -331,7 +329,7 @@ export default function TrainDashboard() {
                     const routeStations = validStations(inst.train.stations);
                     const first = routeStations[0];
                     const last = routeStations[routeStations.length - 1];
-                    return <button key={inst.key} className={`map-train-card ${selectedInstance?.key === inst.key ? "active" : ""}`} onClick={() => { setFitAllToken(0); setSelectedKey(inst.key); }}>
+                    return <button key={inst.key} className={`map-train-card ${selectedInstance?.key === inst.key ? "active" : ""}`} onClick={() => { setSelectedKey(inst.key); }}>
                       <div className="map-train-head">
                         <span className="map-train-dot" style={{ background: ["#1769aa", "#8b1fc8", "#0f8a67", "#e07a00", "#3155d8", "#c43d76", "#1487a8", "#7356c8"][colorIndex % 8] }} />
                         <b>{inst.train.trainNo}</b>
@@ -349,8 +347,34 @@ export default function TrainDashboard() {
           )}
         </aside>
 
+        <aside className={`today-left-drawer ${todaysScheduledTrains.length ? "" : "empty"}`}>
+          <button className="today-dropdown-button" onClick={() => setShowTodayList((v) => !v)} aria-expanded={showTodayList}>
+            <span className="running-dropdown-icon">📅</span>
+            <span><b>TODAY'S TRAIN</b><small>{todaysScheduledTrains.length} trains scheduled</small></span>
+            <span className="running-chevron">{showTodayList ? "▾" : "▸"}</span>
+          </button>
+          {showTodayList && <>
+            <div className="today-train-list">
+              {todaysScheduledTrains.map((train) => {
+                const routeStations = validStations(train.stations);
+                const first = routeStations[0], last = routeStations[routeStations.length - 1];
+                const active = runningNowInstances.find((x) => x.train.trainNo === train.trainNo);
+                return <button key={train.trainNo} className={`today-list-card ${active ? "running" : ""}`} onClick={() => {
+                  if (active) setSelectedKey(active.key);
+                }}>
+                  <div className="today-list-head"><b>{train.trainNo}</b><span>{active ? "RUNNING" : "TODAY"}</span></div>
+                  <div className="today-list-route">{first?.stationCode || "—"} <i>→</i> {last?.stationCode || "—"}</div>
+                  <div className="today-list-meta">{firstTime(routeStations, "departure")} • {trainDayLabel(train)}</div>
+                </button>;
+              })}
+              {!todaysScheduledTrains.length && <div className="empty">No trains scheduled today.</div>}
+            </div>
+          </>}
+        </aside>
+        </div>
+
         {selectedInstance && <aside className="map-right-drawer">
-          <div className="drawer-head"><div><div className="drawer-title"><span className="drawer-dot" /> {selectedInstance.train.trainNo}</div><div className="drawer-route">{source?.stationName || "—"} → {destination?.stationName || "—"}</div><small>Dep {departureDate?.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small></div><button className="drawer-close" onClick={() => { setFitAllToken(0); setSelectedKey(""); }}>×</button></div>
+          <div className="drawer-head"><div><div className="drawer-title"><span className="drawer-dot" /> {selectedInstance.train.trainNo}</div><div className="drawer-route">{source?.stationName || "—"} → {destination?.stationName || "—"}</div><small>Dep {departureDate?.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small></div><button className="drawer-close" onClick={() => { setSelectedKey(""); }}>×</button></div>
           <div className="drawer-progress"><div><span>{selectedInstance.currentStation} → {selectedInstance.nextStation}</span><b>{selectedInstance.percent}%</b></div><div className="drawer-track"><i style={{ width: `${selectedInstance.percent}%` }} /></div><small>Scheduled position • Day {routeDay}</small></div>
           <div className="drawer-tabs"><b>Route</b><span>Contacts</span><span>Staff</span><span>RM</span></div>
           <div className="drawer-note">Watering points: <b>{watering.length}</b> • S/W {swCount} • O/D {odCount}</div>

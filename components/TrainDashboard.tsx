@@ -229,9 +229,18 @@ export default function TrainDashboard() {
         // Watering alerts are intended only for intermediate watering points.
         if (i === routeStations.length - 1) continue;
         if (!station.watering) continue;
-        const eventTime = rowDateTime(station, inst.departureDate, "arrival") || rowDateTime(station, inst.departureDate, "departure");
+        // Use the next actual timetable event at the watering station.
+        // Prefer arrival when it is still upcoming; if arrival has already
+        // passed but departure is still upcoming, use departure. This prevents
+        // a watering alert from disappearing during the halt at the station.
+        const arrivalTime = rowDateTime(station, inst.departureDate, "arrival");
+        const departureTime = rowDateTime(station, inst.departureDate, "departure");
+        const upcomingTimes = [arrivalTime, departureTime]
+          .filter((t): t is Date => !!t && t.getTime() >= now.getTime())
+          .sort((a, b) => a.getTime() - b.getTime());
+        const eventTime = upcomingTimes[0];
         if (!eventTime) continue;
-        const diff = Math.round((eventTime.getTime() - now.getTime()) / 60000);
+        const diff = Math.floor((eventTime.getTime() - now.getTime()) / 60000);
         const key = `${inst.key}-${station.stationCode}-${i}`;
         if (diff >= 0 && diff <= 20 && !wateringDismissed[key]) {
           alerts.push({ key, trainNo: inst.train.trainNo, station, minutes: diff, departureDate: inst.departureDate });

@@ -133,41 +133,16 @@ export default function RouteMap({
 
   const selectedRoute = routes.find((r) => r.instance.key === selectedKey);
   const visibleRoutes = selectedKey ? routes.filter((r) => r.instance.key === selectedKey) : routes;
-  const markerPositions = useMemo(() => {
-    const counts = new Map<string, number>();
-    const positions = new Map<string, [number, number]>();
-    routes.forEach((route) => {
-      const routeStations = route.instance.stations
+  const runningPoints = visibleRoutes
+    .map((r) => {
+      const routeStations = r.instance.stations
         .filter((s) => !isExcludedStation(s))
         .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
-      const currentStation = routeStations.find((s) => s.stationName === route.instance.currentStationName);
-      const base = currentStation
+      const currentStation = routeStations.find((s) => s.stationName === r.instance.currentStationName);
+      return currentStation
         ? [currentStation.latitude as number, currentStation.longitude as number] as [number, number]
-        : route.current || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))];
-      if (!base) return;
-
-      // Multiple running trains can legitimately be at the same scheduled
-      // station. Give their map labels a small deterministic spread so every
-      // running train remains visible instead of one marker covering another.
-      const groupKey = `${base[0].toFixed(4)},${base[1].toFixed(4)}`;
-      const slot = counts.get(groupKey) || 0;
-      counts.set(groupKey, slot + 1);
-      if (slot === 0) {
-        positions.set(route.instance.key, base);
-      } else {
-        const angle = (slot - 1) * (Math.PI / 3);
-        const radius = 0.045;
-        positions.set(route.instance.key, [
-          base[0] + Math.sin(angle) * radius,
-          base[1] + Math.cos(angle) * radius,
-        ]);
-      }
-    });
-    return positions;
-  }, [routes]);
-
-  const runningPoints = visibleRoutes
-    .map((r) => markerPositions.get(r.instance.key))
+        : r.current || r.points[Math.max(0, Math.min(r.points.length - 1, Math.round((r.instance.percent / 100) * (r.points.length - 1))))];
+    })
     .filter(Boolean) as [number, number][];
   const mapFitPoints = selectedRoute?.points.length ? selectedRoute.points : runningPoints;
   const center: [number, number] = [22.5, 79.0];
@@ -188,14 +163,18 @@ export default function RouteMap({
       {routes.map((route) => <Fragment key={route.instance.key}>
         {route.instance.key === selectedKey && route.solid.map((line, i) => <Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 6, opacity: 0.95 }} />)}
         {route.instance.key === selectedKey && route.dotted.map((line, i) => <Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 5, opacity: 0.8, dashArray: "7 9" }} />)}
-        {route.points.length > 0 && (() => {
+        {(() => {
           const routeStations = route.instance.stations
             .filter((s) => !isExcludedStation(s))
             .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
-          const currentStation = routeStations.find((s) => s.stationName === route.instance.currentStationName);
-          const markerPosition = markerPositions.get(route.instance.key) || (currentStation
+          const currentStation = routeStations.find((s) =>
+            s.stationName.trim().toLowerCase() === route.instance.currentStationName.trim().toLowerCase()
+            || s.stationCode.trim().toLowerCase() === route.instance.currentStationName.trim().toLowerCase()
+          );
+          const markerPosition = currentStation
             ? [currentStation.latitude as number, currentStation.longitude as number] as [number, number]
-            : route.current || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))]);
+            : route.current || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))];
+          if (!markerPosition || !Number.isFinite(markerPosition[0]) || !Number.isFinite(markerPosition[1])) return null;
           const nextWatering = nextWateringStation(route.instance.stations, route.instance.currentStationName);
           const isSelected = route.instance.key === selectedKey;
           const isVisible = !selectedKey || isSelected;

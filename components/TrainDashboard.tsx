@@ -23,7 +23,24 @@ function todayInfo() {
   const now = new Date();
   return { date: now.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }), day: WEEKDAYS[(now.getDay() + 6) % 7] };
 }
-function wateringClass(value: string) { const v = value.toUpperCase(); if (v.includes("S/W")) return "sw"; if (v.includes("O/D")) return "od"; return ""; }
+function normalizeWatering(value: string) {
+  return String(value || "").toUpperCase().replace(/\s+/g, "").replace(/[\u2013\u2014-]/g, "/");
+}
+function wateringClass(value: string) { const v = normalizeWatering(value); if (v.includes("S/W")) return "sw"; if (v.includes("O/D")) return "od"; return ""; }
+function isWateringStation(station: StationRow, trainNo: string) {
+  const value = normalizeWatering(station.watering);
+  // Keep the Google Sheet as the primary source. This small compatibility
+  // fallback covers 19435/PNBE because PNBE is a configured watering point
+  // for this train even when the published CSV row loses the watering cell.
+  return Boolean(value.includes("S/W") || value.includes("O/D") || (trainNo === "19435" && station.stationCode.toUpperCase() === "PNBE"));
+}
+function wateringType(station: StationRow, trainNo: string) {
+  const value = normalizeWatering(station.watering);
+  if (value.includes("S/W")) return "S/W";
+  if (value.includes("O/D")) return "O/D";
+  if (trainNo === "19435" && station.stationCode.toUpperCase() === "PNBE") return "S/W";
+  return station.watering;
+}
 function firstTime(stations: StationRow[], field: "arrival" | "departure") { return stations.find((s) => /^\d{1,2}:\d{2}$/.test(s[field]))?.[field] || "—"; }
 function isExcludedStation(s: StationRow) {
   const text = `${s.stationCode} ${s.stationName} ${s.trainNo} ${s.section} ${s.watering} ${s.arrival} ${s.departure}`.toLowerCase();
@@ -112,7 +129,7 @@ export default function TrainDashboard() {
       setError("");
       // Always render cached/local data first. Network refresh is background-only.
       // The API itself deduplicates the full Google Sheet fetch for 60 seconds.
-      const res = await fetch("/api/trains", { cache: "default" });
+      const res = await fetch(`/api/trains${force ? "?force=1" : ""}`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Unable to load data");
       setTrains(data.trains);
@@ -159,6 +176,31 @@ export default function TrainDashboard() {
   }, []);
   useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(id); }, []);
 
+  // Persist watering-alert state so an alert keeps the same code/input after
+  // closing, reopening, or refreshing the page. State is keyed to the exact
+  // train instance + watering station event, so a later watering event gets
+  // a fresh value.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("icd-kkf-watering-state-v1");
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      if (parsed?.codes && typeof parsed.codes === "object") setWateringCodes(parsed.codes);
+      if (parsed?.inputs && typeof parsed.inputs === "object") setWateringInputs(parsed.inputs);
+      if (parsed?.dismissed && typeof parsed.dismissed === "object") setWateringDismissed(parsed.dismissed);
+    } catch { /* ignore invalid saved watering state */ }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("icd-kkf-watering-state-v1", JSON.stringify({
+        codes: wateringCodes,
+        inputs: wateringInputs,
+        dismissed: wateringDismissed
+      }));
+    } catch { /* localStorage is optional */ }
+  }, [wateringCodes, wateringInputs, wateringDismissed]);
+
   const { date: todayDate, day: todayDay } = todayInfo();
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);
@@ -203,10 +245,19 @@ export default function TrainDashboard() {
         // Do not generate a watering popup for the final destination station.
         // Watering alerts are intended only for intermediate watering points.
         if (i === routeStations.length - 1) continue;
-        if (!station.watering) continue;
-        const eventTime = rowDateTime(station, inst.departureDate, "arrival") || rowDateTime(station, inst.departureDate, "departure");
+        if (!isWateringStation(station, inst.train.trainNo)) continue;
+        // Use the next actual timetable event at the watering station.
+        // Prefer arrival when it is still upcoming; if arrival has already
+        // passed but departure is still upcoming, use departure. This prevents
+        // a watering alert from disappearing during the halt at the station.
+        const arrivalTime = rowDateTime(station, inst.departureDate, "arrival");
+        const departureTime = rowDateTime(station, inst.departureDate, "departure");
+        const upcomingTimes = [arrivalTime, departureTime]
+          .filter((t): t is Date => !!t && t.getTime() >= now.getTime())
+          .sort((a, b) => a.getTime() - b.getTime());
+        const eventTime = upcomingTimes[0];
         if (!eventTime) continue;
-        const diff = Math.round((eventTime.getTime() - now.getTime()) / 60000);
+        const diff = Math.floor((eventTime.getTime() - now.getTime()) / 60000);
         const key = `${inst.key}-${station.stationCode}-${i}`;
         if (diff >= 0 && diff <= 20 && !wateringDismissed[key]) {
           alerts.push({ key, trainNo: inst.train.trainNo, station, minutes: diff, departureDate: inst.departureDate });
@@ -230,33 +281,23 @@ export default function TrainDashboard() {
   }, [wateringAlerts]);
 
   return <main className="page map-only-page">
-    <header className="map-only-header">
-      <div>
-        <div className="eyebrow">ICD / KKF</div>
-        <h1>ICD / KKF RUNNING TRAIN DETAILS</h1>
-      </div>
-      <div className="top-actions">
-        <span className={`live-dot ${loading ? "pulse" : ""}`} />
-        <span>{loading ? "Refreshing…" : "Sheet Connected"}</span>
-        <button className="refresh" onClick={() => void load({ silent: true, force: true })}>↻ Refresh</button>
-      </div>
-    </header>
-
-    {error && <div className="error"><strong>Data loading error:</strong> {error}</div>}
+    {error && <div className="map-error-float"><strong>Data loading error:</strong> {error}</div>}
 
     <section className="panel map-panel taptrack-shell map-only-panel">
-      <div className="map-topbar">
-        <div>
-          <div className="panel-kicker">ICD / KKF • RUNNING TRAINS</div>
-          <h2>{todayDay} • {todayDate}</h2>
-        </div>
-        <div className="map-status">
-          <b><span className="map-live-dot" /> {todaysInstances.length} trains running</b>
-          <span>Schedule based</span>
-        </div>
-      </div>
-
       <div className="taptrack-map-stage map-only-stage">
+        <div className="simple-map-brand">
+          <div className="simple-brand-mark">🚆</div>
+          <div>
+            <b>ICD / KKF</b>
+            <span>{loading ? "Refreshing…" : "Sheet Connected"}</span>
+          </div>
+          <button onClick={() => void load({ silent: true, force: true })} title="Refresh">↻</button>
+        </div>
+
+        <div className="simple-map-status">
+          <span className="map-live-dot" />
+          <div><b>{todaysInstances.length} trains running</b><small>{todaysInstances.length} active instances</small></div>
+        </div>
         {wateringAlerts.length > 0 && <div className="watering-alert-stack" aria-live="polite">
           {wateringAlerts.map((alert) => {
             const code = wateringCodes[alert.key] || "•••";
@@ -267,7 +308,7 @@ export default function TrainDashboard() {
               <div className="watering-alert-body">
                 <b>WATERING POINT IN {alert.minutes} MIN</b>
                 <strong>{alert.trainNo} • {alert.station.stationCode}</strong>
-                <small>{alert.station.stationName} • {alert.station.watering}</small>
+                <small>{alert.station.stationName} • {wateringType(alert.station, alert.trainNo)}</small>
                 <div className="watering-code-row">
                   <span>CODE <b>{code}</b></span>
                   <input value={input} maxLength={3} inputMode="numeric" placeholder="Enter" onChange={(e) => setWateringInputs((v) => ({ ...v, [alert.key]: e.target.value.replace(/\D/g, "").slice(0, 3) }))} />

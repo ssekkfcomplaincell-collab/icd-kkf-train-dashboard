@@ -103,9 +103,7 @@ export default function TrainDashboard() {
   const [wateringCodes, setWateringCodes] = useState<Record<string, string>>({});
   const [wateringDismissed, setWateringDismissed] = useState<Record<string, boolean>>({});
   const [wateringInputs, setWateringInputs] = useState<Record<string, string>>({});
-  const [wateringAdjustments, setWateringAdjustments] = useState<Record<string, number>>({});
   const [showRunningList, setShowRunningList] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   async function load(options: { silent?: boolean; force?: boolean } = {}) {
     const { silent = false, force = false } = options;
@@ -136,21 +134,12 @@ export default function TrainDashboard() {
 
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem("icd-kkf-watering-adjustments-v1");
-      if (saved) setWateringAdjustments(JSON.parse(saved));
       const savedInputs = window.localStorage.getItem("icd-kkf-watering-inputs-v1");
       if (savedInputs) setWateringInputs(JSON.parse(savedInputs));
-      const savedTheme = window.localStorage.getItem("icd-kkf-theme-v1");
-      if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme);
+      const savedCodes = window.localStorage.getItem("icd-kkf-watering-codes-v1");
+      if (savedCodes) setWateringCodes(JSON.parse(savedCodes));
     } catch { /* ignore invalid local state */ }
-  }, []);
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    try { window.localStorage.setItem("icd-kkf-theme-v1", theme); } catch { /* ignore */ }
-  }, [theme]);
-
-  useEffect(() => {
     let hasCache = false;
     try {
       const cached = window.localStorage.getItem("icd-kkf-train-cache-v1");
@@ -181,7 +170,6 @@ export default function TrainDashboard() {
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);
   const todaysInstances = runningNowInstances;
-  const todayTotalTrains = useMemo(() => trains.filter((t) => t.runningDays?.[todayDay]).length, [trains, todayDay]);
   const mapInstances = useMemo(() => runningNowInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent, currentStationName: inst.currentStation })), [todaysInstances]);
   const baseTrains = todayOnly ? trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0) : trains;
 
@@ -238,12 +226,28 @@ export default function TrainDashboard() {
     return visibleAlerts.sort((a, b) => a.minutes - b.minutes);
   }, [runningNowInstances, now, wateringDismissed, selectedKey]);
 
+  // Watering code is tied to the exact watering event (train instance + station).
+  // Keep it in localStorage so the same code survives refreshes, closing/reopening
+  // the page, and opening the dashboard in a new tab. A new watering event gets
+  // a new code automatically.
   useEffect(() => {
     setWateringCodes((current) => {
       const next = { ...current };
+      let changed = false;
+
       for (const alert of wateringAlerts) {
-        if (!next[alert.key]) next[alert.key] = String(Math.floor(100 + Math.random() * 900));
+        if (!next[alert.key]) {
+          next[alert.key] = String(Math.floor(100 + Math.random() * 900));
+          changed = true;
+        }
       }
+
+      if (changed) {
+        try {
+          window.localStorage.setItem("icd-kkf-watering-codes-v1", JSON.stringify(next));
+        } catch { /* localStorage is optional */ }
+      }
+
       return next;
     });
   }, [wateringAlerts]);
@@ -257,7 +261,6 @@ export default function TrainDashboard() {
       <div className="top-actions">
         <span className={`live-dot ${loading ? "pulse" : ""}`} />
         <span>{loading ? "Refreshing…" : "Sheet Connected"}</span>
-        <button className="theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? "☾ Dark" : "☀ Light"}</button>
         <button className="refresh" onClick={() => void load({ silent: true, force: true })}>↻ Refresh</button>
       </div>
     </header>
@@ -292,11 +295,6 @@ export default function TrainDashboard() {
                   <span>CODE <b>{code}</b></span>
                   <input value={input} maxLength={3} inputMode="numeric" placeholder="Enter" onChange={(e) => { const value = e.target.value.replace(/\D/g, "").slice(0, 3); setWateringInputs((v) => { const next = { ...v, [alert.key]: value }; try { window.localStorage.setItem("icd-kkf-watering-inputs-v1", JSON.stringify(next)); } catch {} return next; }); }} />
                   <button disabled={!solved} onClick={() => setWateringDismissed((v) => ({ ...v, [alert.key]: true }))}>✓</button>
-                </div>
-                <div className="watering-adjust-row">
-                  <span>TIME ADJUSTMENT</span>
-                  <b>{alert.minutes}-{wateringAdjustments[alert.key] || 0} = {Math.max(0, alert.minutes - (wateringAdjustments[alert.key] || 0))} MIN</b>
-                  <input type="number" min="0" max="999" placeholder="0" value={wateringAdjustments[alert.key] ?? ""} onChange={(e) => { const value = Math.max(0, Number(e.target.value) || 0); setWateringAdjustments((v) => { const next = { ...v, [alert.key]: value }; try { window.localStorage.setItem("icd-kkf-watering-adjustments-v1", JSON.stringify(next)); } catch {} return next; }); }} />
                 </div>
               </div>
               <button className="watering-alert-arrow" title="Open train route" onClick={() => setSelectedKey(`${alert.trainNo}-${dateKey(alert.departureDate)}`)}>›</button>
@@ -348,12 +346,6 @@ export default function TrainDashboard() {
             </>
           )}
         </aside>
-
-        <div className="today-total-card">
-          <span className="today-total-icon">📅</span>
-          <span><b>TODAY&apos;S TOTAL</b><small>{todayTotalTrains} trains scheduled today</small></span>
-          <strong>{todayTotalTrains}</strong>
-        </div>
 
         {selectedInstance && <aside className="map-right-drawer">
           <div className="drawer-head"><div><div className="drawer-title"><span className="drawer-dot" /> {selectedInstance.train.trainNo}</div><div className="drawer-route">{source?.stationName || "—"} → {destination?.stationName || "—"}</div><small>Dep {departureDate?.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small></div><button className="drawer-close" onClick={() => setSelectedKey("")}>×</button></div>

@@ -145,8 +145,12 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
 
     const codeKey = stationCode.toUpperCase();
     const coordinate = coordinates.get(codeKey) || (() => {
-      const value = (fallbackStationCoordinates as Record<string, [number, number]>)[codeKey];
-      return value ? { latitude: value[0], longitude: value[1] } : undefined;
+      const value = (fallbackStationCoordinates as Record<string, number[]>)[codeKey];
+      if (!Array.isArray(value) || value.length < 2) return undefined;
+      const latitude = Number(value[0]);
+      const longitude = Number(value[1]);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
+      return { latitude, longitude };
     })();
     train.stations.push({
       trainNo,

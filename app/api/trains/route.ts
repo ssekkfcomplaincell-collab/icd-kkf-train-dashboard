@@ -14,7 +14,9 @@ export async function GET(request: Request) {
     // Refresh requests are intentionally soft: the server cache is reused
     // within its TTL so repeated clicks do not download the same sheet again.
     // A cold server or expired cache performs the full sheet fetch.
-    const trains = await getTrainData({ force: false });
+    const url = new URL(request.url);
+    const force = url.searchParams.get("force") === "1";
+    const trains = await getTrainData({ force });
 
     return NextResponse.json(
       {
@@ -24,7 +26,7 @@ export async function GET(request: Request) {
       },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300"
+          "Cache-Control": "no-store, no-cache, must-revalidate"
         }
       }
     );

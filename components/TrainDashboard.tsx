@@ -112,7 +112,7 @@ export default function TrainDashboard() {
       setError("");
       // Always render cached/local data first. Network refresh is background-only.
       // The API itself deduplicates the full Google Sheet fetch for 60 seconds.
-      const res = await fetch("/api/trains", { cache: "default" });
+      const res = await fetch(`/api/trains${force ? "?force=1" : ""}`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Unable to load data");
       setTrains(data.trains);

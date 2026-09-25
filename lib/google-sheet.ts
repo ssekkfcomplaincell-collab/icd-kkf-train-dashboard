@@ -1,18 +1,19 @@
 import Papa from "papaparse";
 import { StationRow, Train, Weekday } from "./types";
 
+const SCHEDULE_SPREADSHEET_ID = "1HBFYHFkf7P5yZ2dC76FkZF5Pfe-QVtilDDFW6nTdE";
+const SCHEDULE_GID = "1463153132";
 const DEFAULT_SCHEDULE_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQXHb-McVF62fJFt1CDecykHzBwhmXnG9NrUTOyn1-iZIg2NFBZ6YySnxgwihcdvFLvMPXDk3WZ0g7z/pub?gid=1463153132&single=true&output=csv";
+  `https://docs.google.com/spreadsheets/d/${SCHEDULE_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=${SCHEDULE_GID}`;
 
 const SPREADSHEET_ID = "1HBFYHFkf7Pq5YdZ2zC76FkZF5Pfe-QVtilDDFW6nTdE";
 const COORDINATE_SHEET_GID = "1506639435";
 const DEFAULT_COORDINATES_CSV_URL =
   `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=${COORDINATE_SHEET_GID}`;
 
-// Server-side cache: fetch the complete sheets once, then reuse the parsed
-// result for 60 seconds. This prevents repeated/duplicate Google Sheet
-// downloads on every refresh while still picking up changes automatically.
-const CACHE_TTL_MS = 60_000;
+// Server-side cache: reuse the parsed sheets briefly to avoid duplicate requests
+// while still picking up schedule changes quickly.
+const CACHE_TTL_MS = 15_000;
 let trainCache: { data: Train[]; savedAt: number } | null = null;
 let trainFetchInFlight: Promise<Train[]> | null = null;
 

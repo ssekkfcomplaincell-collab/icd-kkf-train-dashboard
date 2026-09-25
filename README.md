@@ -1,5 +1,8 @@
-# ICD / KKF Dashboard V26
+# ICD / KKF Dashboard V23
 
-Based on V25. Fixes the mismatch where the dashboard could report e.g. 18 running trains while only 16 train labels were visually distinguishable on the map.
+Fixes V22 running-train detection.
 
-Map markers at the same current scheduled station are now given a small deterministic geographic spread, so overlapping train labels remain visible. Selected-train behavior remains unchanged.
+## Important fix
+The Monday-Sunday Y/N service flags are now collected across **all rows belonging to each train**, instead of reading only the first row. This handles sheets where weekday values are present only on a source/particular row and prevents valid services from being shown as `0 trains running`.
+
+All V22 features are retained: map-only dashboard, India-focused map, running-area fit, running dropdown, selected-train route, watering popup behavior, and Vercel runtime/build fixes.

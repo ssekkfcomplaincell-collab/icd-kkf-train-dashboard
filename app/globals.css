@@ -138,7 +138,7 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 
 @keyframes wateringPulse { 0%,100% { box-shadow:0 10px 28px rgba(15,23,42,.18); } 50% { box-shadow:0 10px 28px rgba(22,163,111,.28), 0 0 0 3px rgba(22,163,111,.08); } }
 @media (max-width:1100px) { .watering-alert-stack { right:14px; top:300px; width:285px; } }
-@media (max-width:700px) { .watering-alert-stack { left:10px; right:10px; top:255px; width:auto; } }
+@media (max-width:700px) { .watering-alert-stack { left:auto; right:10px; top:10px; width:285px; max-width:calc(100vw - 20px); } }
 
 /* Map-only dashboard layout */
 .map-only-page { max-width:none; width:100%; min-height:100vh; padding:14px; }

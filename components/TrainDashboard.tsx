@@ -159,6 +159,31 @@ export default function TrainDashboard() {
   }, []);
   useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(id); }, []);
 
+  // Persist watering-alert state so an alert keeps the same code/input after
+  // closing, reopening, or refreshing the page. State is keyed to the exact
+  // train instance + watering station event, so a later watering event gets
+  // a fresh value.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("icd-kkf-watering-state-v1");
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      if (parsed?.codes && typeof parsed.codes === "object") setWateringCodes(parsed.codes);
+      if (parsed?.inputs && typeof parsed.inputs === "object") setWateringInputs(parsed.inputs);
+      if (parsed?.dismissed && typeof parsed.dismissed === "object") setWateringDismissed(parsed.dismissed);
+    } catch { /* ignore invalid saved watering state */ }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("icd-kkf-watering-state-v1", JSON.stringify({
+        codes: wateringCodes,
+        inputs: wateringInputs,
+        dismissed: wateringDismissed
+      }));
+    } catch { /* localStorage is optional */ }
+  }, [wateringCodes, wateringInputs, wateringDismissed]);
+
   const { date: todayDate, day: todayDay } = todayInfo();
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);

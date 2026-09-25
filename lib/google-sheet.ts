@@ -1,5 +1,6 @@
 import Papa from "papaparse";
 import { StationRow, Train, Weekday } from "./types";
+import fallbackStationCoordinates from "@/data/station-coordinates.json";
 
 const SCHEDULE_SPREADSHEET_ID = "1HBFYHFkf7P5yZ2dC76FkZF5Pfe-QVtilDDFW6nTdE";
 const SCHEDULE_GID = "1463153132";
@@ -142,7 +143,11 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
       if (isYes(pick(rawRow, [day]))) train.runningDays[day] = true;
     }
 
-    const coordinate = coordinates.get(stationCode.toUpperCase());
+    const codeKey = stationCode.toUpperCase();
+    const coordinate = coordinates.get(codeKey) || (() => {
+      const value = (fallbackStationCoordinates as Record<string, [number, number]>)[codeKey];
+      return value ? { latitude: value[0], longitude: value[1] } : undefined;
+    })();
     train.stations.push({
       trainNo,
       stationCode,

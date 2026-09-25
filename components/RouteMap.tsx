@@ -163,14 +163,18 @@ export default function RouteMap({
       {routes.map((route) => <Fragment key={route.instance.key}>
         {route.instance.key === selectedKey && route.solid.map((line, i) => <Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 6, opacity: 0.95 }} />)}
         {route.instance.key === selectedKey && route.dotted.map((line, i) => <Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 5, opacity: 0.8, dashArray: "7 9" }} />)}
-        {route.points.length > 0 && (() => {
+        {(() => {
           const routeStations = route.instance.stations
             .filter((s) => !isExcludedStation(s))
             .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
-          const currentStation = routeStations.find((s) => s.stationName === route.instance.currentStationName);
+          const currentStation = routeStations.find((s) =>
+            s.stationName.trim().toLowerCase() === route.instance.currentStationName.trim().toLowerCase()
+            || s.stationCode.trim().toLowerCase() === route.instance.currentStationName.trim().toLowerCase()
+          );
           const markerPosition = currentStation
             ? [currentStation.latitude as number, currentStation.longitude as number] as [number, number]
             : route.current || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))];
+          if (!markerPosition || !Number.isFinite(markerPosition[0]) || !Number.isFinite(markerPosition[1])) return null;
           const nextWatering = nextWateringStation(route.instance.stations, route.instance.currentStationName);
           const isSelected = route.instance.key === selectedKey;
           const isVisible = !selectedKey || isSelected;

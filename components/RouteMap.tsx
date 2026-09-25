@@ -21,16 +21,16 @@ function isExcludedStation(station: StationRow) {
 
 const INDIA_BOUNDS: [[number, number], [number, number]] = [[7.8, 68.0], [37.2, 97.5]];
 
-function FitBounds({ points, selected }: { points: [number, number][]; selected: boolean }) {
+function FitBounds({ points, allPoints, selected, fitToken }: { points: [number, number][]; allPoints: [number, number][]; selected: boolean; fitToken: number }) {
   const map = useMap();
   useEffect(() => {
-    const target = points;
+    const target = fitToken > 0 && allPoints.length ? allPoints : points;
     if (target.length) {
-      map.fitBounds(target, { padding: selected ? [45, 45] : [70, 70], maxZoom: selected ? 8 : 7.5 });
+      map.fitBounds(target, { padding: selected && fitToken === 0 ? [45, 45] : [70, 70], maxZoom: selected && fitToken === 0 ? 8 : 7.5 });
       return;
     }
     map.fitBounds(INDIA_BOUNDS, { padding: [12, 12], maxZoom: 5.6 });
-  }, [map, points, selected]);
+  }, [map, points, allPoints, selected, fitToken]);
   return null;
 }
 
@@ -79,10 +79,16 @@ export default function RouteMap({
   instances,
   selectedKey,
   onTrainClick,
+  hideAll = false,
+  fitAllToken = 0,
+  theme = "light",
 }: {
   instances: MapTrainInstance[];
   selectedKey: string;
   onTrainClick: (key: string) => void;
+  hideAll?: boolean;
+  fitAllToken?: number;
+  theme?: "light" | "dark";
 }) {
   const routes = useMemo(() => instances.map((instance, index) => {
     const points = instance.stations
@@ -145,7 +151,7 @@ export default function RouteMap({
   const mapFitPoints = selectedRoute?.points.length ? selectedRoute.points : runningPoints;
   const center: [number, number] = [22.5, 79.0];
 
-  return <div className="real-map taptrack-map">
+  return <div className={`real-map taptrack-map ${theme === "dark" ? "map-night" : ""}`}>
     <MapContainer
       center={center}
       zoom={6.2}
@@ -160,7 +166,7 @@ export default function RouteMap({
         attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <FitBounds points={mapFitPoints} selected={Boolean(selectedRoute)} />
+      <FitBounds points={mapFitPoints} allPoints={runningPoints} selected={Boolean(selectedRoute)} fitToken={fitAllToken} />
       {routes.map((route) => <Fragment key={route.instance.key}>
         {route.instance.key === selectedKey && route.solid.map((line, i) => <Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 6, opacity: 0.95 }} />)}
         {route.instance.key === selectedKey && route.dotted.map((line, i) => <Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 5, opacity: 0.8, dashArray: "7 9" }} />)}
@@ -174,7 +180,7 @@ export default function RouteMap({
             : route.current || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))];
           const nextWatering = nextWateringStation(route.instance.stations, route.instance.currentStationName);
           const isSelected = route.instance.key === selectedKey;
-          const isVisible = !selectedKey || isSelected;
+          const isVisible = !hideAll && (!selectedKey || isSelected);
           if (!isVisible) return null;
           return <Marker
             position={markerPosition}

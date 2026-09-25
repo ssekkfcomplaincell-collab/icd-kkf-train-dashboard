@@ -190,6 +190,7 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .map-running-pill b { font-size:13px; color:#1f3042; }
 .map-running-pill small { font-size:9px; color:#6f7e8f; font-weight:700; }
 .map-control-btn { width:38px; height:38px; border:1px solid #d7e0e9; border-radius:11px; background:rgba(255,255,255,.96); color:#53667a; box-shadow:0 8px 26px rgba(15,23,42,.13); cursor:pointer; font-size:18px; font-weight:800; display:grid; place-items:center; backdrop-filter:blur(10px); }
+.map-control-btn.fit { font-size:20px; }
 .map-control-btn.active { background:#eaf4fb; color:#1769aa; border-color:#a9cce5; }
 .map-error { position:absolute; z-index:1600; top:62px; left:50%; transform:translateX(-50%); width:min(700px,calc(100% - 28px)); margin:0; }
 
@@ -275,39 +276,60 @@ html[data-theme="dark"] .leaflet-control-attribution { background:rgba(17,25,35,
   .watering-alert-stack { top:56px !important; }
 }
 
-/* ICD / KKF left-side stacked Running + Today's Train panels */
-.map-left-stack {
-  position:absolute; z-index:1300; top:68px; left:14px; width:250px;
-  display:flex; flex-direction:column; gap:8px; max-height:calc(100vh - 84px);
+/* Today's trains drawer: collapsed by default, expandable on demand. */
+.map-today-drawer {
+  position:absolute; z-index:1290; left:14px; top:122px; width:250px;
+  max-height:calc(100vh - 138px); overflow:hidden;
+  background:rgba(255,255,255,.96); border:1px solid rgba(215,224,233,.95);
+  border-radius:13px; box-shadow:0 8px 26px rgba(15,23,42,.13); backdrop-filter:blur(10px);
 }
-.map-left-stack .map-left-drawer,
-.map-left-stack .today-left-drawer { position:relative; top:auto; left:auto; width:100%; max-height:none; }
-.today-left-drawer { overflow:hidden; border-radius:13px; background:rgba(255,255,255,.96); border:1px solid rgba(215,224,233,.95); box-shadow:0 8px 26px rgba(15,23,42,.13); backdrop-filter:blur(10px); }
-.today-dropdown-button { width:100%; min-height:48px; border:0; background:transparent; display:flex; align-items:center; gap:9px; padding:9px 10px; cursor:pointer; text-align:left; color:#1c2b3b; }
-.today-dropdown-button b { display:block; font-size:11px; }
-.today-dropdown-button small { display:block; margin-top:2px; color:#748294; font-size:8px; }
-.today-train-list { max-height:290px; overflow:auto; padding:6px 7px 8px; border-top:1px solid #e3eaf0; }
-.today-list-card { width:100%; margin:3px 0; padding:8px 9px; border:1px solid #dbe4ec; background:#fbfdff; border-radius:9px; cursor:pointer; text-align:left; }
-.today-list-card:hover { border-color:#a9cce5; }
-.today-list-card.running { box-shadow:inset 3px 0 0 #1aa57a; }
-.today-list-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.today-list-head b { font-size:12px; }
-.today-list-head span { font-size:7px; color:#0d8b68; font-weight:800; }
-.today-list-route { margin-top:5px; font-size:9px; font-weight:800; color:#42627c; }
-.today-list-route i { font-style:normal; margin:0 4px; color:#1d8ac0; }
-.today-list-meta { margin-top:4px; font-size:7px; color:#7a8998; }
-html[data-theme="dark"] .today-left-drawer { background:rgba(17,25,35,.94); border-color:#2a394a; }
-html[data-theme="dark"] .today-dropdown-button { color:#e8eef6; }
+.map-today-drawer.collapsed { width:190px; }
+.today-dropdown-button {
+  width:100%; min-height:48px; display:flex; align-items:center; gap:9px; padding:9px 10px;
+  border:0; background:transparent; color:#1d3042; cursor:pointer; text-align:left;
+}
+.today-dropdown-icon { width:28px; height:28px; display:grid; place-items:center; border-radius:9px; background:#eef6fb; font-size:15px; flex:0 0 auto; }
+.today-dropdown-button span:nth-child(2) { flex:1; min-width:0; }
+.today-dropdown-button b { display:block; font-size:11px; letter-spacing:.02em; }
+.today-dropdown-button small { display:block; margin-top:2px; color:#738294; font-size:8px; }
+.today-brand { min-height:48px; }
+.today-status-list { max-height:calc(100vh - 225px); overflow:auto; padding:7px; }
+.today-status-card {
+  display:block; width:100%; border:1px solid var(--line); background:#fbfdff; border-radius:9px;
+  padding:9px; margin-bottom:6px; text-align:left; cursor:pointer; color:inherit;
+}
+.today-status-card:hover { border-color:#9bc4df; background:#fff; }
+.today-status-head { display:flex; align-items:center; justify-content:space-between; gap:7px; }
+.today-status-head>b { font-size:12px; }
+.today-status { font-size:7px; font-weight:900; letter-spacing:.04em; padding:3px 5px; border-radius:5px; white-space:nowrap; }
+.today-status.running { color:#0c7c56; background:#e4f6ee; }
+.today-status.completed { color:#64707d; background:#edf0f3; }
+.today-status.depart { color:#9a6500; background:#fff1d6; }
+.today-status-route { margin-top:6px; font-size:9px; font-weight:800; color:#466075; }
+.today-status-route span { color:var(--accent); padding:0 3px; }
+.today-status-meta { margin-top:4px; font-size:8px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.today-status-meta span { color:#7890a3; }
+.today-footer-close { border:0; background:none; color:var(--accent); font-size:8px; font-weight:800; cursor:pointer; padding:0; }
+
+/* Mild mobile-night effect on the same OpenStreetMap tiles; no CARTO/API key required. */
+.taptrack-map.map-night .leaflet-tile-pane { filter: brightness(.66) contrast(.92) saturate(.82); }
+.taptrack-map.map-night .leaflet-overlay-pane { filter:none; }
+
+html[data-theme="dark"] .map-today-drawer { background:rgba(17,25,35,.95); border-color:#2a394a; color:#e7edf5; }
+html[data-theme="dark"] .today-dropdown-button { color:#e7edf5; }
+html[data-theme="dark"] .today-dropdown-icon { background:#182b3a; }
 html[data-theme="dark"] .today-dropdown-button small { color:#9aa9ba; }
-html[data-theme="dark"] .today-train-list { border-color:#273544; }
-html[data-theme="dark"] .today-list-card { background:#121d28; border-color:#2a3949; color:#e5edf5; }
-html[data-theme="dark"] .today-list-route { color:#86bce0; }
-html[data-theme="dark"] .today-list-meta { color:#93a3b4; }
-html[data-theme="dark"] .leaflet-tile-pane { filter:brightness(.52) contrast(1.08) saturate(.78); }
+html[data-theme="dark"] .today-status-card { background:#121d28; border-color:#2a3949; color:#e5edf5; }
+html[data-theme="dark"] .today-status-card:hover { background:#162330; border-color:#3b5970; }
+html[data-theme="dark"] .today-status-route { color:#9bb7ca; }
+html[data-theme="dark"] .today-status-meta { color:#9aa9ba; }
+html[data-theme="dark"] .today-status.running { color:#57d3a4; background:#12392f; }
+html[data-theme="dark"] .today-status.completed { color:#b5c0cb; background:#26313b; }
+html[data-theme="dark"] .today-status.depart { color:#f0bd67; background:#3a2d18; }
+
 @media (max-width:700px) {
-  .map-left-stack { top:55px; left:10px; width:180px; max-height:calc(100dvh - 70px); }
-  .today-train-list { max-height:230px; }
-}
-@media (max-width:430px) {
-  .map-left-stack { width:170px; }
+  .map-today-drawer { top:110px; left:10px; width:180px; max-height:calc(100dvh - 122px); }
+  .map-today-drawer.collapsed { width:170px; }
+  .today-status-list { max-height:calc(100dvh - 208px); }
+  .taptrack-map.map-night .leaflet-tile-pane { filter: brightness(.69) contrast(.93) saturate(.85); }
 }

@@ -255,33 +255,23 @@ export default function TrainDashboard() {
   }, [wateringAlerts]);
 
   return <main className="page map-only-page">
-    <header className="map-only-header">
-      <div>
-        <div className="eyebrow">ICD / KKF</div>
-        <h1>ICD / KKF RUNNING TRAIN DETAILS</h1>
-      </div>
-      <div className="top-actions">
-        <span className={`live-dot ${loading ? "pulse" : ""}`} />
-        <span>{loading ? "Refreshing…" : "Sheet Connected"}</span>
-        <button className="refresh" onClick={() => void load({ silent: true, force: true })}>↻ Refresh</button>
-      </div>
-    </header>
-
-    {error && <div className="error"><strong>Data loading error:</strong> {error}</div>}
+    {error && <div className="map-error-float"><strong>Data loading error:</strong> {error}</div>}
 
     <section className="panel map-panel taptrack-shell map-only-panel">
-      <div className="map-topbar">
-        <div>
-          <div className="panel-kicker">ICD / KKF • RUNNING TRAINS</div>
-          <h2>{todayDay} • {todayDate}</h2>
-        </div>
-        <div className="map-status">
-          <b><span className="map-live-dot" /> {todaysInstances.length} trains running</b>
-          <span>Schedule based</span>
-        </div>
-      </div>
-
       <div className="taptrack-map-stage map-only-stage">
+        <div className="simple-map-brand">
+          <div className="simple-brand-mark">🚆</div>
+          <div>
+            <b>ICD / KKF</b>
+            <span>{loading ? "Refreshing…" : "Sheet Connected"}</span>
+          </div>
+          <button onClick={() => void load({ silent: true, force: true })} title="Refresh">↻</button>
+        </div>
+
+        <div className="simple-map-status">
+          <span className="map-live-dot" />
+          <div><b>{todaysInstances.length} trains running</b><small>{todaysInstances.length} active instances</small></div>
+        </div>
         {wateringAlerts.length > 0 && <div className="watering-alert-stack" aria-live="polite">
           {wateringAlerts.map((alert) => {
             const code = wateringCodes[alert.key] || "•••";

@@ -100,7 +100,6 @@ export default function TrainDashboard() {
   const [updatedAt, setUpdatedAt] = useState("");
   const [lastRefresh, setLastRefresh] = useState("");
   const [now, setNow] = useState(new Date());
-  const [wateringCodes, setWateringCodes] = useState<Record<string, string>>({});
   const [wateringDismissed, setWateringDismissed] = useState<Record<string, boolean>>({});
   const [wateringInputs, setWateringInputs] = useState<Record<string, string>>({});
   const [showRunningList, setShowRunningList] = useState(false);
@@ -235,34 +234,17 @@ export default function TrainDashboard() {
     return visibleAlerts.sort((a, b) => a.minutes - b.minutes);
   }, [runningNowInstances, now, wateringDismissed, selectedKey]);
 
-  // Watering code is tied to the exact watering event (train instance + station).
-  // Keep it in localStorage so the same code survives refreshes, closing/reopening
-  // the page, and opening the dashboard in a new tab. A new watering event gets
-  // a new code automatically.
-  useEffect(() => {
-    setWateringCodes((current) => {
-      const next = { ...current };
-      let changed = false;
-
-      for (const alert of wateringAlerts) {
-        if (!next[alert.key]) {
-          let hash = 0;
-          for (let i = 0; i < alert.key.length; i++) hash = ((hash << 5) - hash + alert.key.charCodeAt(i)) | 0;
-          const deterministicCode = String(100 + (Math.abs(hash) % 900));
-          next[alert.key] = deterministicCode;
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        try {
-          window.localStorage.setItem("icd-kkf-watering-codes-v1", JSON.stringify(next));
-        } catch { /* localStorage is optional */ }
-      }
-
-      return next;
-    });
-  }, [wateringAlerts]);
+  // Watering code is derived only from the exact watering event.
+  // It is intentionally NOT stored in localStorage, so desktop/mobile/new tabs
+  // all calculate the same code for the same train + departure date + station.
+  function wateringEventCode(alert: { trainNo: string; departureDate: Date; station: StationRow }) {
+    const eventId = `${alert.trainNo}|${dateKey(alert.departureDate)}|${alert.station.stationCode}|${alert.station.stationName}|${alert.station.watering}`;
+    let hash = 0;
+    for (let i = 0; i < eventId.length; i++) {
+      hash = ((hash << 5) - hash + eventId.charCodeAt(i)) | 0;
+    }
+    return String(100 + (Math.abs(hash) % 900));
+  }
 
   return <main className="page map-only-page">
     {error && <div className="error map-error"><strong>Data loading error:</strong> {error}</div>}
@@ -281,7 +263,7 @@ export default function TrainDashboard() {
         </div>
         {wateringAlerts.length > 0 && <div className="watering-alert-stack" aria-live="polite">
           {wateringAlerts.map((alert) => {
-            const code = wateringCodes[alert.key] || "•••";
+            const code = wateringEventCode(alert);
             const input = wateringInputs[alert.key] || "";
             const solved = input === code;
             return <div key={alert.key} className="watering-alert">

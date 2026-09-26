@@ -89,17 +89,35 @@ function serviceInstance(train: Train, departureDate: Date, now: Date): ServiceI
   return { key: `${train.trainNo}-${dateKey(departureDate)}`, train, departureDate, status: "RUNNING NOW", currentStation: stations[Math.min(currentIndex, stations.length - 1)].stationName, nextStation: stations[Math.min(currentIndex + 1, stations.length - 1)].stationName, percent };
 }
 
+function trainRunsOnDate(train: Train, date: Date) {
+  const flags = WEEKDAYS.map((day) => train.runningDays?.[day] === true);
+  const hasAnyWeekdayFlag = flags.some(Boolean);
+
+  // The current schedule sheet does not contain weekday columns for every
+  // service row. In that case runningDays can legitimately be empty even
+  // though the train is a daily service. Treat an entirely-unmarked train as
+  // daily instead of silently dropping it from RUNNING NOW. If at least one
+  // weekday is explicitly marked, honour the schedule flags.
+  if (!hasAnyWeekdayFlag) return true;
+  return train.runningDays?.[weekdayForDate(date)] === true;
+}
+
 function activeInstances(train: Train, now: Date): ServiceInstance[] {
   const stations = validStations(train.stations);
-  const maxDay = Math.max(1, ...stations.map((s) => scheduleDayNumber(s.day)).filter(Number.isFinite));
+  const dayNumbers = stations.map((s) => scheduleDayNumber(s.day)).filter(Number.isFinite);
+  const maxDay = Math.max(1, ...dayNumbers);
   const out: ServiceInstance[] = [];
+
+  // Check every possible departure date covered by the longest schedule day.
+  // This keeps Day-2/Day-3 overnight services visible after midnight.
   for (let back = 0; back < maxDay; back++) {
     const depDate = atMidnight(new Date(now));
     depDate.setDate(depDate.getDate() - back);
-    if (!train.runningDays?.[weekdayForDate(depDate)]) continue;
+    if (!trainRunsOnDate(train, depDate)) continue;
     const inst = serviceInstance(train, depDate, now);
     if (inst) out.push(inst);
   }
+
   return out.sort((a, b) => b.departureDate.getTime() - a.departureDate.getTime());
 }
 

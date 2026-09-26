@@ -39,8 +39,7 @@ function numberValue(value: string): number | undefined {
 }
 
 function isYes(value: unknown): boolean {
-  const v = clean(value).toUpperCase();
-  return ["Y", "YES", "TRUE", "1", "X", "✓", "✔", "RUNNING"].includes(v);
+  return ["Y", "YES", "TRUE", "1"].includes(clean(value).toUpperCase());
 }
 
 async function fetchCsv(url: string): Promise<Record<string, unknown>[]> {

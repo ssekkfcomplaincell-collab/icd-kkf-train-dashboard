@@ -1,6 +1,5 @@
 import Papa from "papaparse";
 import { StationRow, Train, Weekday } from "./types";
-import fallbackStationCoordinates from "@/data/station-coordinates.json";
 
 const SCHEDULE_SPREADSHEET_ID = "1HBFYHFkf7P5yZ2dC76FkZF5Pfe-QVtilDDFW6nTdE";
 const SCHEDULE_GID = "1463153132";
@@ -12,11 +11,6 @@ const DIRECT_SCHEDULE_EXPORT_URL =
   `https://docs.google.com/spreadsheets/d/${SCHEDULE_SPREADSHEET_ID}/export?format=csv&gid=${SCHEDULE_GID}`;
 const GVIZ_SCHEDULE_CSV_URL =
   `https://docs.google.com/spreadsheets/d/${SCHEDULE_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=${SCHEDULE_GID}`;
-
-const SPREADSHEET_ID = "1HBFYHFkf7Pq5YdZ2zC76FkZF5Pfe-QVtilDDFW6nTdE";
-const COORDINATE_SHEET_GID = "1506639435";
-const DEFAULT_COORDINATES_CSV_URL =
-  `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=${COORDINATE_SHEET_GID}`;
 
 // Server-side cache: reuse the parsed sheets briefly to avoid duplicate requests
 // while still picking up schedule changes quickly.
@@ -102,7 +96,6 @@ function isExcludedRow(row: Record<string, unknown>) {
 
 async function fetchAndBuildTrainData(): Promise<Train[]> {
   const configuredScheduleUrl = (process.env.GOOGLE_SHEET_CSV_URL || "").trim();
-  const configuredCoordinateUrl = (process.env.GOOGLE_COORDINATES_CSV_URL || "").trim();
 
   // The published CSV is the primary source. If Vercel has an old/broken
   // GOOGLE_SHEET_CSV_URL environment variable, automatically fall back instead
@@ -114,25 +107,10 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
     DIRECT_SCHEDULE_EXPORT_URL,
     GVIZ_SCHEDULE_CSV_URL,
   ]);
-  const coordinateRowsPromise = fetchCsvWithFallback([
-    configuredCoordinateUrl,
-    DEFAULT_COORDINATES_CSV_URL,
-  ]).catch(() => [] as Record<string, unknown>[]);
-
-  const [scheduleRows, coordinateRows] = await Promise.all([
-    scheduleRowsPromise,
-    coordinateRowsPromise,
-  ]);
-
-  const coordinates = new Map<string, { latitude: number; longitude: number }>();
-  for (const row of coordinateRows) {
-    const code = pick(row, ["Station Code", "Station code", "Code"]).toUpperCase();
-    const longitude = numberValue(pick(row, ["Longitude", "LONGITUDE", "Long"]));
-    const latitude = numberValue(pick(row, ["Latitude", "LATITUDE", "Lat"]));
-    if (code && latitude !== undefined && longitude !== undefined) {
-      coordinates.set(code, { latitude, longitude });
-    }
-  }
+  // Coordinates are now read directly from Column X (Longitude) and
+  // Column Y (Latitude) of the same Section Wise Details / schedule sheet.
+  // No separate coordinate sheet or local JSON file is required.
+  const scheduleRows = await scheduleRowsPromise;
 
   // IMPORTANT: weekday flags live in the original Google Sheet rows and are
   // often present only on the first/source row of a train. Do NOT map them
@@ -164,15 +142,22 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
       if (isYes(pick(rawRow, [day]))) train.runningDays[day] = true;
     }
 
-    const codeKey = stationCode.toUpperCase();
-    const coordinate = coordinates.get(codeKey) || (() => {
-      const value = (fallbackStationCoordinates as Record<string, number[]>)[codeKey];
-      if (!Array.isArray(value) || value.length < 2) return undefined;
-      const latitude = Number(value[0]);
-      const longitude = Number(value[1]);
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return undefined;
-      return { latitude, longitude };
-    })();
+    // Column X = Longitude, Column Y = Latitude in the same sheet.
+    // Header names are preferred, with X/Y fallbacks for sheets whose
+    // coordinate columns do not have standard headers.
+    const rowKeys = Object.keys(rawRow);
+    const longitude = numberValue(
+      pick(rawRow, ["Longitude", "LONGITUDE", "Long", "X", "Longitude (X)"]) ||
+        clean(rawRow[rowKeys[23]])
+    );
+    const latitude = numberValue(
+      pick(rawRow, ["Latitude", "LATITUDE", "Lat", "Y", "Latitude (Y)"]) ||
+        clean(rawRow[rowKeys[24]])
+    );
+    const coordinate =
+      latitude !== undefined && longitude !== undefined
+        ? { latitude, longitude }
+        : undefined;
     train.stations.push({
       trainNo,
       stationCode,

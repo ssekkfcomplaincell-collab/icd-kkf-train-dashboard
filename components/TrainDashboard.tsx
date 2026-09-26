@@ -253,7 +253,7 @@ export default function TrainDashboard() {
       ? visibleAlerts.filter((alert) => alert.key.startsWith(`${selectedKey}-`))
       : visibleAlerts;
     return selectedVisible.sort((a, b) => a.minutes - b.minutes);
-  }, [runningNowInstances, now, selectedKey]);
+  }, [runningNowInstances, now, selectedKey, wateringDismissed]);
 
 
   return <main className="page map-only-page">

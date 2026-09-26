@@ -23,13 +23,6 @@ function todayInfo() {
   const now = new Date();
   return { date: now.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }), day: WEEKDAYS[(now.getDay() + 6) % 7] };
 }
-function todayCalendarLabel() {
-  const now = new Date();
-  return {
-    day: now.toLocaleDateString("en-IN", { day: "2-digit" }),
-    month: now.toLocaleDateString("en-IN", { month: "short" }).toUpperCase(),
-  };
-}
 function wateringClass(value: string) { const v = value.toUpperCase(); if (v.includes("S/W")) return "sw"; if (v.includes("O/D")) return "od"; return ""; }
 function firstTime(stations: StationRow[], field: "arrival" | "departure") { return stations.find((s) => /^\d{1,2}:\d{2}$/.test(s[field]))?.[field] || "—"; }
 function isExcludedStation(s: StationRow) {
@@ -244,6 +237,7 @@ export default function TrainDashboard() {
   const totalDistance = destination?.distance || "—";
   const swCount = watering.filter((s) => s.watering.toUpperCase().includes("S/W")).length;
   const odCount = watering.filter((s) => s.watering.toUpperCase().includes("O/D")).length;
+  const garbageCount = valid.filter((s) => Boolean((s as StationRow & { garbage?: boolean }).garbage)).length;
   const mappedCount = valid.filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)).length;
   const routeDay = selectedInstance ? Math.max(1, Math.min(99, Math.floor((atMidnight(now).getTime() - atMidnight(departureDate!).getTime()) / 86400000) + 1)) : null;
 
@@ -285,7 +279,12 @@ export default function TrainDashboard() {
         <div className="map-status">
           <b><span className="map-live-dot" /> {todaysInstances.length} trains running</b>
           <span>Schedule based</span>
-          <button className="refresh map-refresh" onClick={() => window.location.reload()} title="Refresh page">↻ Refresh</button>
+          <div className="map-top-actions">
+            <button className="theme-toggle map-theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>
+              {theme === "light" ? "☾" : "☀"}
+            </button>
+            <button className="refresh map-refresh" onClick={() => window.location.reload()} title="Refresh page">↻ Refresh</button>
+          </div>
         </div>
       </div>
 
@@ -360,8 +359,8 @@ export default function TrainDashboard() {
         <aside className={`today-train-drawer ${showTodayTrainList ? "open" : "collapsed"}`}>
           {!showTodayTrainList ? (
             <button className="today-train-collapsed" onClick={() => setShowTodayTrainList(true)} aria-expanded="false">
-              <span className="today-train-icon" aria-label="Today&apos;s date"><span className="today-calendar-month">{todayCalendarLabel().month}</span><strong>{todayCalendarLabel().day}</strong></span>
-              <span className="today-train-label"><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></span>
+              <span className="today-train-icon">📅</span>
+              <span><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></span>
               <span className="today-train-chevron">▾</span>
             </button>
           ) : (
@@ -394,8 +393,8 @@ export default function TrainDashboard() {
           <div className="drawer-head"><div><div className="drawer-title"><span className="drawer-dot" /> {selectedInstance.train.trainNo}</div><div className="drawer-route">{source?.stationName || "—"} → {destination?.stationName || "—"}</div><small>Dep {departureDate?.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small></div><button className="drawer-close" onClick={() => setSelectedKey("")}>×</button></div>
           <div className="drawer-progress"><div><span>{selectedInstance.currentStation} → {selectedInstance.nextStation}</span><b>{selectedInstance.percent}%</b></div><div className="drawer-track"><i style={{ width: `${selectedInstance.percent}%` }} /></div><small>Scheduled position • Day {routeDay}</small></div>
           <div className="drawer-tabs"><b>Route</b><span>Contacts</span><span>Staff</span><span>RM</span></div>
-          <div className="drawer-note">Watering points: <b>{watering.length}</b> • S/W {swCount} • O/D {odCount}</div>
-          <div className="drawer-stops">{valid.map((s, i) => { const st = rowDateTime(s, departureDate || now, "arrival") || rowDateTime(s, departureDate || now, "departure"); const passed = st ? now >= st : false; const isCurrent = selectedInstance.currentStation === s.stationName; return <div className={`drawer-stop ${passed ? "passed" : ""} ${isCurrent ? "current" : ""}`} key={`${s.stationCode}-${i}`}><span className="drawer-stop-dot" /> <div><b>{s.stationName} <em>{s.stationCode}</em></b><small>{s.arrival || s.departure || "—"} • Day {s.day} {s.watering ? <strong className={wateringClass(s.watering)}>{s.watering}</strong> : null}</small></div></div>; })}</div>
+          <div className="drawer-note">Watering points: <b>{watering.length}</b> • S/W {swCount} • O/D {odCount} • 🗑️ Garbage {garbageCount}</div>
+          <div className="drawer-stops">{valid.map((s, i) => { const st = rowDateTime(s, departureDate || now, "arrival") || rowDateTime(s, departureDate || now, "departure"); const passed = st ? now >= st : false; const isCurrent = selectedInstance.currentStation === s.stationName; const isGarbage = Boolean((s as StationRow & { garbage?: boolean }).garbage); return <div className={`drawer-stop ${passed ? "passed" : ""} ${isCurrent ? "current" : ""}`} key={`${s.stationCode}-${i}`}><span className="drawer-stop-dot" /> <div><b>{s.stationName} <em>{s.stationCode}</em></b><small>{s.arrival || s.departure || "—"} • Day {s.day} {s.watering ? <strong className={wateringClass(s.watering)}>{s.watering}</strong> : null} {isGarbage ? <strong className="garbage-badge">🗑️ Garbage</strong> : null}</small></div></div>; })}</div>
         </aside>}
       </div>
     </section>

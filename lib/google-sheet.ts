@@ -158,6 +158,14 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
       latitude !== undefined && longitude !== undefined
         ? { latitude, longitude }
         : undefined;
+
+    // Column P = Garbage Station. The user marks YES separately for each
+    // train/station row, so keep the flag with the individual station.
+    const garbageValue =
+      pick(rawRow, ["Garbage Station", "Garbage", "Garbage Station (YES/NO)"]) ||
+      clean(rawRow[rowKeys[15]]);
+    const garbage = isYes(garbageValue);
+
     train.stations.push({
       trainNo,
       stationCode,
@@ -169,8 +177,9 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
       section: pick(rawRow, ["Section"]),
       watering: pick(rawRow, ["Watering Station (S/W, O/D)", "Watering Station"]),
       latitude: coordinate?.latitude,
-      longitude: coordinate?.longitude
-    });
+      longitude: coordinate?.longitude,
+      garbage
+    } as StationRow & { garbage?: boolean });
   }
 
   return Array.from(groups.values()).sort((a, b) =>

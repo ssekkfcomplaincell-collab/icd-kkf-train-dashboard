@@ -159,7 +159,7 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .running-dropdown-button b { display:block; color:#16283b; font-size:12px; letter-spacing:.04em; }
 .running-dropdown-button small { display:block; margin-top:2px; color:#718096; font-size:9px; }
 .running-chevron { margin-left:auto; color:#1769aa; font-size:17px; font-weight:900; }
-.running-close { order:-1; margin-left:0 !important; margin-right:1px !important; flex:0 0 27px; width:27px; height:27px; padding:0 !important; border:1px solid #d8e4ec !important; background:#f7fafc !important; color:#68798b !important; border-radius:7px !important; font-size:18px !important; line-height:1; cursor:pointer; }
+.running-close { margin-left:auto !important; width:27px; height:27px; padding:0 !important; border:1px solid #d8e4ec !important; background:#f7fafc !important; color:#68798b !important; border-radius:7px !important; font-size:18px !important; line-height:1; cursor:pointer; }
 .map-list-footer span:last-child { color:#1769aa; }
 @media (max-width:700px) {
   .map-only-page { padding:8px; }
@@ -169,91 +169,72 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
   .map-left-drawer.collapsed { width:180px; right:auto; }
 }
 
-/* Running + Today's Train drawers: same collapsed size */
-.map-left-drawer.collapsed, .today-train-drawer.collapsed { width:190px; max-height:none; }
-.today-train-drawer { position:absolute; z-index:800; top:14px; right:14px; width:190px; max-height:650px; display:flex; flex-direction:column; background:rgba(255,255,255,.96); border:1px solid rgba(210,220,230,.95); border-radius:14px; box-shadow:0 12px 35px rgba(15,23,42,.16); overflow:hidden; }
-.today-train-collapsed { width:100%; min-height:58px; display:flex; align-items:center; gap:9px; border:0; background:#fff; padding:12px 13px; cursor:pointer; text-align:left; }
-.today-train-collapsed:hover { background:#f7fafc; }
-.today-train-icon { width:32px; height:32px; display:grid; place-items:center; border-radius:9px; background:#eef6fb; font-size:17px; flex:0 0 auto; }
-.today-train-collapsed b { display:block; color:#16283b; font-size:12px; letter-spacing:.04em; }
-.today-train-collapsed small { display:block; margin-top:2px; color:#718096; font-size:9px; }
-.today-train-chevron { margin-left:auto; color:#1769aa; font-size:17px; font-weight:900; }
-.today-train-head { display:flex; align-items:center; gap:9px; padding:11px 12px; border-bottom:1px solid var(--line); }
-.today-train-head b { display:block; font-size:12px; }
-.today-train-head small { display:block; color:var(--muted); font-size:9px; margin-top:2px; }
-.today-train-head button { margin-left:auto; width:27px; height:27px; border:1px solid #d8e4ec; background:#f7fafc; color:#68798b; border-radius:7px; font-size:18px; line-height:1; cursor:pointer; }
-.today-train-list { overflow:auto; padding:6px; }
-.today-train-item { display:block; width:100%; text-align:left; background:#fff; border:1px solid #e8edf2; border-radius:9px; margin:4px 0; padding:9px; cursor:pointer; }
-.today-train-item:disabled { opacity:1; cursor:default; }
-.today-train-item-top { display:flex; align-items:center; gap:6px; }
-.today-train-item-top>b { font-size:13px; }
-.today-status { margin-left:auto; font-size:7px; font-weight:800; }
-.today-status.running { color:#16855b; }
-.today-status.completed { color:#1769aa; }
-.today-status.depart { color:#b86b00; }
-.today-train-route { margin-top:5px; color:#4c6074; font-size:10px; font-weight:800; }
-.today-train-dep { margin-top:6px; color:#718096; font-size:8px; }
+
+/* Theme toggle + full-screen light/dark mode */
+.theme-toggle { border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:9px; width:38px; height:36px; display:inline-grid; place-items:center; cursor:pointer; font-size:19px; box-shadow:0 4px 14px rgba(15,23,42,.08); }
+.theme-toggle:hover { border-color:var(--accent); transform:translateY(-1px); }
+.map-top-actions { display:flex; align-items:center; gap:7px; }
+.map-theme-toggle { flex:0 0 auto; }
+.garbage-badge { display:inline-flex; align-items:center; gap:3px; margin-left:5px; padding:2px 5px; border-radius:5px; background:#fff1f1; color:#b42318; font-size:8px; font-weight:800; font-style:normal; white-space:nowrap; }
+
+html[data-theme="dark"] {
+  --bg:#11151b;
+  --panel:#1b2129;
+  --ink:#edf3f8;
+  --muted:#9aa8b7;
+  --line:#303a46;
+  --accent:#55a9ef;
+  --accent-soft:#1d3448;
+  --green:#39c98b;
+  --green-soft:#183a2e;
+  --orange:#f0a33c;
+  --orange-soft:#3a2b18;
+  --danger:#ff6b6b;
+  --shadow:0 12px 32px rgba(0,0,0,.32);
+}
+html[data-theme="dark"], html[data-theme="dark"] body { background:var(--bg); color:var(--ink); }
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .map-topbar,
+html[data-theme="dark"] .map-left-drawer,
+html[data-theme="dark"] .map-right-drawer,
+html[data-theme="dark"] .today-train-drawer { background:rgba(27,33,41,.97); color:var(--ink); border-color:var(--line); }
+html[data-theme="dark"] .taptrack-map-stage { background:#171c23; }
+html[data-theme="dark"] .running-dropdown-button,
+html[data-theme="dark"] .today-train-collapsed,
+html[data-theme="dark"] .map-brand button,
+html[data-theme="dark"] .running-close,
+html[data-theme="dark"] .refresh,
+html[data-theme="dark"] .theme-toggle { background:#202832; color:var(--ink); border-color:#3a4653; }
+html[data-theme="dark"] .running-dropdown-button b,
+html[data-theme="dark"] .today-train-collapsed b,
+html[data-theme="dark"] .map-brand b { color:var(--ink); }
+html[data-theme="dark"] .map-search,
+html[data-theme="dark"] input,
+html[data-theme="dark"] select { background:#161c23; color:var(--ink); border-color:#3a4653; }
+html[data-theme="dark"] .map-train-card,
+html[data-theme="dark"] .today-train-item { background:#1d252e; color:var(--ink); border-color:#35414e; }
+html[data-theme="dark"] .map-train-card:hover,
+html[data-theme="dark"] .today-train-item:hover { background:#25303b; }
+html[data-theme="dark"] .map-list-footer,
+html[data-theme="dark"] .drawer-note,
+html[data-theme="dark"] .drawer-tabs { border-color:var(--line); color:var(--muted); }
+html[data-theme="dark"] .drawer-head,
+html[data-theme="dark"] .today-train-head { border-color:var(--line); }
+html[data-theme="dark"] .drawer-close,
+html[data-theme="dark"] .today-train-head button { background:#242d37; color:var(--ink); border-color:#3a4653; }
+html[data-theme="dark"] .watering-alert { background:rgba(57,20,24,.97); border-color:#8f3d46; color:#fff; }
+html[data-theme="dark"] .watering-alert-body strong,
+html[data-theme="dark"] .watering-alert-body small { color:#f1d8db; }
+html[data-theme="dark"] .watering-code-row input { background:#161c23; color:#fff; border-color:#596775; }
+html[data-theme="dark"] .garbage-badge { background:#4a2327; color:#ff9a9a; }
+html[data-theme="dark"] .map-overlay-legend { background:rgba(27,33,41,.94); color:#e7edf3; }
+html[data-theme="dark"] .leaflet-control-zoom a,
+html[data-theme="dark"] .leaflet-control-layers,
+html[data-theme="dark"] .leaflet-control-attribution { filter:invert(.9) hue-rotate(180deg); }
+html[data-theme="dark"] .leaflet-tile { filter:brightness(.58) contrast(1.12) saturate(.82); }
+html[data-theme="dark"] .leaflet-container { background:#171b20; }
+
 @media (max-width:700px) {
-  /* Mobile: both collapsed boxes use exactly the same width and height. */
-  .map-left-drawer.collapsed, .today-train-drawer.collapsed {
-    width:calc(50% - 15px);
-    max-width:none;
-    height:94px;
-    min-height:94px;
-  }
-  .map-left-drawer { top:10px; left:10px; right:auto; width:calc(100% - 20px); max-height:250px; }
-  .today-train-drawer { top:10px; right:10px; left:auto; width:calc(100% - 20px); max-height:250px; }
-  .running-dropdown-button, .today-train-collapsed {
-    min-height:94px;
-    height:94px;
-    padding:10px 11px;
-    gap:7px;
-  }
-  .running-dropdown-button > span:nth-child(2), .today-train-label {
-    min-width:0;
-    flex:1 1 auto;
-  }
-  .running-dropdown-button b, .today-train-collapsed b {
-    font-size:11px;
-    line-height:1.15;
-    white-space:nowrap;
-  }
-  .running-dropdown-button small, .today-train-collapsed small {
-    font-size:8px;
-  }
-  .running-dropdown-icon, .today-train-icon {
-    width:30px;
-    height:30px;
-    flex:0 0 30px;
-  }
-  .today-train-icon {
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-    align-items:center;
-    gap:0;
-    border:1px solid #d9e6ef;
-    background:#f4f8fb;
-    line-height:1;
-    overflow:hidden;
-  }
-  .today-calendar-month {
-    display:block;
-    width:100%;
-    padding:2px 0 1px;
-    background:#d94b3d;
-    color:#fff;
-    font-size:6px;
-    font-weight:900;
-    text-align:center;
-  }
-  .today-train-icon strong {
-    display:block;
-    color:#26384a;
-    font-size:12px;
-    line-height:15px;
-  }
-  .today-train-chevron { font-size:15px; flex:0 0 auto; }
-  .map-train-list { display:flex; flex-direction:column; }
-  .map-train-card { width:100%; flex:0 0 auto; }
+  .map-top-actions { gap:5px; }
+  .map-theme-toggle { width:34px; height:34px; font-size:17px; }
 }

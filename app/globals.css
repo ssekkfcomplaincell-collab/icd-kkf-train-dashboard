@@ -171,28 +171,28 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 
 
 /* Today's Train floating box - right top of map */
-.today-train-box { position:absolute; z-index:1100; top:14px; right:14px; width:350px; max-height:calc(100% - 28px); background:rgba(255,255,255,.97); border:1px solid #d8e4ec; border-radius:12px; box-shadow:0 10px 30px rgba(15,23,42,.18); overflow:hidden; }
-.today-train-box-head { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 13px; border-bottom:1px solid #e5edf2; background:#fbfdff; }
-.today-train-box-head b { display:block; color:#172b3f; font-size:11px; letter-spacing:.05em; }
+.today-train-box { position:absolute; z-index:1100; top:14px; right:14px; width:310px; max-height:calc(100% - 28px); background:rgba(255,255,255,.97); border:1px solid #d8e4ec; border-radius:12px; box-shadow:0 10px 30px rgba(15,23,42,.18); overflow:hidden; }
+.today-train-box-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid #e5edf2; background:#fbfdff; }
+.today-train-box-head b { display:block; color:#172b3f; font-size:10px; letter-spacing:.05em; }
 .today-train-box-head small { display:block; margin-top:3px; color:#718096; font-size:8px; }
 .today-train-count { min-width:28px; height:28px; display:grid; place-items:center; border-radius:8px; background:#eef6fb; color:#1769aa; font-size:13px; font-weight:900; }
-.today-train-box-list { max-height:360px; overflow:auto; padding:7px; }
-.today-train-row { display:block; width:100%; border:1px solid #e1eaf0; background:#fff; border-radius:9px; padding:8px 9px; margin-bottom:6px; text-align:left; cursor:pointer; }
+.today-train-box-list { max-height:420px; overflow:auto; padding:7px; }
+.today-train-row { display:block; width:100%; border:1px solid #e1eaf0; background:#fff; border-radius:8px; padding:7px 8px; margin-bottom:5px; text-align:left; cursor:pointer; }
 .today-train-row:hover { border-color:#9bc4df; background:#fbfdff; }
 .today-train-row-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.today-train-row-top>b { color:#172b3f; font-size:12px; }
+.today-train-row-top>b { color:#172b3f; font-size:11px; }
 .today-status { font-size:7px; font-weight:900; letter-spacing:.05em; padding:3px 5px; border-radius:5px; }
 .today-status.running { color:#087d58; background:#e8f8f1; }
 .today-status.completed { color:#64748b; background:#eef2f6; }
 .today-status.departing { color:#a76400; background:#fff3df; }
-.today-train-route { margin-top:5px; color:#26384a; font-size:10px; font-weight:800; }
+.today-train-route { margin-top:4px; color:#26384a; font-size:9px; font-weight:800; }
 .today-train-route i { color:#1769aa; font-style:normal; padding:0 3px; }
-.today-train-current { margin-top:3px; color:#718096; font-size:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.today-train-current { margin-top:3px; color:#718096; font-size:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .today-train-current span { color:#a0aaba; }
-.today-train-progress { display:flex; align-items:center; gap:6px; margin-top:6px; }
+.today-train-progress { display:flex; align-items:center; gap:6px; margin-top:5px; }
 .today-train-progress>span { flex:1; height:4px; background:#e9eff3; border-radius:99px; overflow:hidden; }
 .today-train-progress>span>i { display:block; height:100%; background:#1769aa; border-radius:99px; }
 .today-train-progress small { width:26px; text-align:right; color:#6f7f8f; font-size:7px; font-weight:800; }
 .today-train-empty { padding:20px 10px; text-align:center; color:#718096; font-size:9px; }
-@media (max-width:1100px) { .today-train-box { right:14px; width:315px; } }
+@media (max-width:1100px) { .today-train-box { right:14px; width:300px; } }
 @media (max-width:700px) { .today-train-box { top:10px; right:10px; width:285px; max-width:calc(100vw - 20px); max-height:245px; } .today-train-box-list { max-height:190px; } }

@@ -257,30 +257,17 @@ export default function TrainDashboard() {
 
 
   return <main className="page map-only-page">
-    <header className="map-only-header">
-      <div>
-        <div className="eyebrow">ICD / KKF</div>
-        <h1>ICD / KKF RUNNING TRAIN DETAILS</h1>
-      </div>
-      <div className="top-actions">
-        <span className={`live-dot ${loading ? "pulse" : ""}`} />
-        <span>{loading ? "Refreshing…" : "Sheet Connected"}</span>
-        <button className="theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? "☾ Dark" : "☀ Light"}</button>
-        <button className="refresh" onClick={() => void load({ silent: true, force: true })}>↻ Refresh</button>
-      </div>
-    </header>
-
     {error && <div className="error"><strong>Data loading error:</strong> {error}</div>}
 
     <section className="panel map-panel taptrack-shell map-only-panel">
       <div className="map-topbar">
         <div>
-          <div className="panel-kicker">ICD / KKF • RUNNING TRAINS</div>
           <h2>{todayDay} • {todayDate}</h2>
         </div>
         <div className="map-status">
           <b><span className="map-live-dot" /> {todaysInstances.length} trains running</b>
           <span>Schedule based</span>
+          <button className="refresh map-refresh" onClick={() => window.location.reload()} title="Refresh page">↻ Refresh</button>
         </div>
       </div>
 

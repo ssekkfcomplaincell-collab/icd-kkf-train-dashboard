@@ -218,3 +218,27 @@ html[data-theme="dark"] .today-status.depart { background:#3a2b17; color:#f0ad52
 /* Today's Train departure date */
 .today-train-dep { margin-top:4px; color:var(--muted); font-size:8px; font-weight:700; }
 .today-train-item .today-train-dep { letter-spacing:.01em; }
+
+
+/* Final compact mobile layout */
+.map-only-header { display:none !important; }
+.map-only-stage { height:calc(100vh - 52px); min-height:620px; }
+.map-refresh { margin-left:8px; white-space:nowrap; }
+.map-topbar { align-items:center; }
+@media (max-width:700px) {
+  .map-only-page { padding:6px; }
+  .map-only-stage { height:calc(100vh - 52px); min-height:600px; }
+  .map-left-drawer.collapsed { width:178px; }
+  .today-train-drawer { top:8px !important; right:8px !important; width:160px !important; max-height:205px !important; }
+  .today-train-collapsed { padding:8px 9px; gap:6px; }
+  .today-train-icon { width:23px; height:23px; font-size:12px; }
+  .today-train-collapsed b { font-size:8px; }
+  .today-train-collapsed small { font-size:7px; }
+  .today-train-list { max-height:155px !important; padding:3px; }
+  .today-train-item { padding:6px 5px; }
+  .today-train-item-top > b { font-size:10px; }
+  .today-status { font-size:6px; padding:2px 4px; }
+  .today-train-route { font-size:7px; }
+  .today-train-dep { font-size:7px; }
+  .watering-alert-stack { top:86px !important; }
+}

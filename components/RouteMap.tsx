@@ -45,8 +45,39 @@ export default function RouteMap({instances,selectedKey,onTrainClick,hideAll=fal
    for(let i=0;i<geoStations.length-1;i++){const a=geoStations[i].s,b=geoStations[i+1].s;const dep=segmentTime(a,instance.departureDate,"departure"),arr=segmentTime(b,instance.departureDate,"arrival");if(!dep||!arr){dotted.push([geoStations[i].coord,geoStations[i+1].coord]);continue;}const now=new Date();if(now>=arr)solid.push([geoStations[i].coord,geoStations[i+1].coord]);else if(now<=dep)dotted.push([geoStations[i].coord,geoStations[i+1].coord]);else{const ratio=Math.max(0,Math.min(1,(now.getTime()-dep.getTime())/Math.max(1,arr.getTime()-dep.getTime())));current=interpolate(geoStations[i].coord,geoStations[i+1].coord,ratio);solid.push([geoStations[i].coord,current]);dotted.push([current,geoStations[i+1].coord]);}}
    return {instance,index,stations,geoStations,points,solid,dotted,current,color:trainColor(index)};
  }),[instances]);
- const selectedRoute=routes.find(r=>r.instance.key===selectedKey); const visibleRoutes=selectedKey?routes.filter(r=>r.instance.key===selectedKey):routes;
- const runningPoints=visibleRoutes.map(r=>{const currentStation=r.stations.find(s=>s.stationName===r.instance.currentStationName);const c=currentStation?stationCoord(currentStation):null;return c||r.current||r.points[Math.max(0,Math.min(r.points.length-1,Math.round((r.instance.percent/100)*Math.max(0,r.points.length-1))))]||null;}).filter(Boolean) as [number,number][];
+ const selectedRoute=routes.find(r=>r.instance.key===selectedKey);
+ const visibleRoutes=selectedKey?routes.filter(r=>r.instance.key===selectedKey):routes;
+
+ // Every running instance gets its own marker. If two trains are at the same
+ // scheduled station, spread their labels so neither one hides the other.
+ const markerPositions=useMemo(()=>{
+   const counts=new Map<string,number>();
+   const positions=new Map<string,[number,number]>();
+   for(const route of visibleRoutes){
+     const currentStation=route.stations.find(s=>s.stationName.trim().toLowerCase()===route.instance.currentStationName.trim().toLowerCase());
+     const base= currentStation ? stationCoord(currentStation) : (route.current || route.points[Math.max(0,Math.min(route.points.length-1,Math.round((route.instance.percent/100)*Math.max(0,route.points.length-1))))] || stationCoord(route.stations[0]));
+     if(!base) continue;
+     const groupKey=`${base[0].toFixed(4)},${base[1].toFixed(4)}`;
+     const slot=counts.get(groupKey)||0;
+     counts.set(groupKey,slot+1);
+     if(slot===0){
+       positions.set(route.instance.key,base);
+     }else{
+       const angle=(slot-1)*(Math.PI/3);
+       const radius=0.035;
+       positions.set(route.instance.key,[base[0]+Math.sin(angle)*radius,base[1]+Math.cos(angle)*radius]);
+     }
+   }
+   return positions;
+ },[visibleRoutes]);
+
+ const runningPoints=visibleRoutes.map(r=>markerPositions.get(r.instance.key)||r.points[0]||null).filter(Boolean) as [number,number][];
  const mapFitPoints=selectedRoute?.points.length?selectedRoute.points:runningPoints;
- return <div className="real-map taptrack-map"><MapContainer center={[22.5,79]} zoom={6.2} minZoom={4.8} maxZoom={12} maxBounds={[[5.5,66.5],[38.5,99.5]]} maxBoundsViscosity={1} scrollWheelZoom className="leaflet-map"><TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/><FitBounds points={mapFitPoints} allPoints={runningPoints} selected={Boolean(selectedRoute)} fitToken={fitAllToken}/>{routes.map(route=><Fragment key={route.instance.key}>{route.instance.key===selectedKey&&route.solid.map((line,i)=><Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{color:route.color,weight:6,opacity:.95}}/>)}{route.instance.key===selectedKey&&route.dotted.map((line,i)=><Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{color:route.color,weight:5,opacity:.8,dashArray:"7 9"}}/>)}{route.points.length>0&&(()=>{const c=stationCoord(route.stations.find(s=>s.stationName===route.instance.currentStationName)||route.stations[0]);const markerPosition=c||route.current||route.points[Math.max(0,Math.min(route.points.length-1,Math.round((route.instance.percent/100)*(route.points.length-1))))];if(!markerPosition)return null;const nextWatering=nextWateringStation(route.instance.stations,route.instance.currentStationName);const isSelected=route.instance.key===selectedKey;if(hideAll|| (selectedKey&&!isSelected))return null;return <Marker position={markerPosition} icon={labelIcon(route.instance.trainNo,route.color,isSelected)} eventHandlers={{click:()=>onTrainClick(route.instance.key)}} zIndexOffset={isSelected?1000:200}><Tooltip direction="top" offset={[0,-16]} opacity={1} className="train-hover-tooltip"><div className="train-hover-tooltip-content"><b>Train {route.instance.trainNo}</b><span>Departure: {formatDepartureDate(route.instance.departureDate)}</span><span>Current: {route.instance.currentStationName}</span><span>Next Watering: {nextWatering?`${nextWatering.stationName} • ${nextWatering.watering}`:"None"}</span></div></Tooltip></Marker>})()}{route.instance.key===selectedKey&&route.points.map((point,i)=><CircleMarker key={`p-${route.instance.key}-${i}`} center={point} radius={4} pathOptions={{color:route.color,weight:1,fillOpacity:.85}} eventHandlers={{click:()=>onTrainClick(route.instance.key)}}/>)}</Fragment>)}</MapContainer><div className="map-overlay-legend taptrack-legend"><span><i className="solid-swatch"/> Completed</span><span><i className="dotted-swatch"/> Pending</span><span>● Click train number for route</span></div></div>;
+ return <div className="real-map taptrack-map"><MapContainer center={[22.5,79]} zoom={6.2} minZoom={4.8} maxZoom={12} maxBounds={[[5.5,66.5],[38.5,99.5]]} maxBoundsViscosity={1} scrollWheelZoom className="leaflet-map"><TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/><FitBounds points={mapFitPoints} allPoints={runningPoints} selected={Boolean(selectedRoute)} fitToken={fitAllToken}/>{routes.map(route=><Fragment key={route.instance.key}>{route.instance.key===selectedKey&&route.solid.map((line,i)=><Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{color:route.color,weight:6,opacity:.95}}/>)}{route.instance.key===selectedKey&&route.dotted.map((line,i)=><Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{color:route.color,weight:5,opacity:.8,dashArray:"7 9"}}/>)}{(()=>{
+   const markerPosition=markerPositions.get(route.instance.key);
+   const nextWatering=nextWateringStation(route.instance.stations,route.instance.currentStationName);
+   const isSelected=route.instance.key===selectedKey;
+   if(hideAll || (selectedKey&&!isSelected) || !markerPosition) return null;
+   return <Marker position={markerPosition} icon={labelIcon(route.instance.trainNo,route.color,isSelected)} eventHandlers={{click:()=>onTrainClick(route.instance.key)}} zIndexOffset={isSelected?1000:200}><Tooltip direction="top" offset={[0,-16]} opacity={1} className="train-hover-tooltip"><div className="train-hover-tooltip-content"><b>Train {route.instance.trainNo}</b><span>Departure: {formatDepartureDate(route.instance.departureDate)}</span><span>Current: {route.instance.currentStationName}</span><span>Next Watering: {nextWatering?`${nextWatering.stationName} • ${nextWatering.watering}`:"None"}</span></div></Tooltip></Marker>;
+ })()}{route.instance.key===selectedKey&&route.points.map((point,i)=><CircleMarker key={`p-${route.instance.key}-${i}`} center={point} radius={4} pathOptions={{color:route.color,weight:1,fillOpacity:.85}} eventHandlers={{click:()=>onTrainClick(route.instance.key)}}/>)}</Fragment>)}</MapContainer><div className="map-overlay-legend taptrack-legend"><span><i className="solid-swatch"/> Completed</span><span><i className="dotted-swatch"/> Pending</span><span>● Click train number for route</span></div></div>;
 }

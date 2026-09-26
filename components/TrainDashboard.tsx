@@ -203,8 +203,38 @@ export default function TrainDashboard() {
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);
   const todaysInstances = runningNowInstances;
-  const todayServiceInstances = useMemo(() => trains.map((t) => todayServiceInstance(t, now)).filter((x): x is ServiceInstance => Boolean(x)), [trains, now]);
-  const todayTotalTrains = useMemo(() => trains.filter((t) => t.runningDays?.[todayDay]).length, [trains, todayDay]);
+  // TODAY'S TRAIN must include BOTH groups:
+  // 1) trains already RUNNING (including trains that departed on a previous day), and
+  // 2) trains whose scheduled journey starts TODAY (DEPT. TODAY / COMPLETED).
+  // Do not replace the running list with only today's departure-date list.
+  const todayServiceInstances = useMemo(() => {
+    const byKey = new Map<string, ServiceInstance>();
+
+    // First add all currently running instances so none of the trains from the
+    // RUNNING box disappear from TODAY'S TRAIN.
+    for (const inst of runningNowInstances) byKey.set(inst.key, inst);
+
+    // Then add today's scheduled services. This includes DEPT. TODAY, RUNNING
+    // TODAY and JOURNEY COMPLETED when the journey started today.
+    for (const train of trains) {
+      const inst = todayServiceInstance(train, now);
+      if (inst) byKey.set(inst.key, inst);
+    }
+
+    const statusOrder: Record<ServiceInstance["status"], number> = {
+      "RUNNING NOW": 0,
+      "DEPARTS TODAY": 1,
+      "COMPLETED": 2,
+    };
+
+    return [...byKey.values()].sort((a, b) => {
+      const statusDiff = statusOrder[a.status] - statusOrder[b.status];
+      if (statusDiff) return statusDiff;
+      return a.departureDate.getTime() - b.departureDate.getTime();
+    });
+  }, [trains, now, runningNowInstances]);
+
+  const todayTotalTrains = todayServiceInstances.length;
   const mapInstances = useMemo(() => runningNowInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent, currentStationName: inst.currentStation })), [todaysInstances]);
   const baseTrains = todayOnly ? trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0) : trains;
 

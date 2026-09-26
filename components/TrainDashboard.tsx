@@ -90,15 +90,8 @@ function serviceInstance(train: Train, departureDate: Date, now: Date): ServiceI
 }
 
 function trainRunsOnDate(train: Train, date: Date) {
-  const flags = WEEKDAYS.map((day) => train.runningDays?.[day] === true);
-  const hasAnyWeekdayFlag = flags.some(Boolean);
-
-  // The current schedule sheet does not contain weekday columns for every
-  // service row. In that case runningDays can legitimately be empty even
-  // though the train is a daily service. Treat an entirely-unmarked train as
-  // daily instead of silently dropping it from RUNNING NOW. If at least one
-  // weekday is explicitly marked, honour the schedule flags.
-  if (!hasAnyWeekdayFlag) return true;
+  // RUNNING NOW must follow the Y/N weekday schedule from the Google Sheet.
+  // Never treat an unmarked train as a daily train.
   return train.runningDays?.[weekdayForDate(date)] === true;
 }
 

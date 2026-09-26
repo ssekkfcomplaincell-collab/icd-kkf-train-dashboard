@@ -127,6 +127,7 @@ export default function TrainDashboard() {
   const [wateringInputs, setWateringInputs] = useState<Record<string, string>>({});
   const [wateringAdjustments, setWateringAdjustments] = useState<Record<string, number>>({});
   const [showRunningList, setShowRunningList] = useState(false);
+  const [showTodayTrainList, setShowTodayTrainList] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
   async function load(options: { silent?: boolean; force?: boolean } = {}) {
@@ -402,33 +403,45 @@ export default function TrainDashboard() {
           )}
         </aside>
 
-        <aside className="today-train-box">
-          <div className="today-train-box-head">
-            <div>
-              <b>📅 TODAY&apos;S TRAIN</b>
-              <small>{todayDate} • {todayTotalTrains} scheduled</small>
-            </div>
-            <span className="today-train-count">{todayServiceInstances.length}</span>
-          </div>
-          <div className="today-train-box-list">
-            {todayServiceInstances.map((inst) => {
-              const routeStations = validStations(inst.train.stations);
-              const first = routeStations[0];
-              const last = routeStations[routeStations.length - 1];
-              const statusClass = inst.status === "RUNNING NOW" ? "running" : inst.status === "COMPLETED" ? "completed" : "departing";
-              const statusText = inst.status === "RUNNING NOW" ? "RUNNING" : inst.status === "COMPLETED" ? "JOURNEY COMPLETED" : "DEPT. TODAY";
-              return <button key={inst.key} className="today-train-row" onClick={() => inst.status === "RUNNING NOW" && setSelectedKey(inst.key)}>
-                <div className="today-train-row-top">
-                  <b>{inst.train.trainNo}</b>
-                  <span className={`today-status ${statusClass}`}>{statusText}</span>
+        <aside className={`today-train-box ${showTodayTrainList ? "open" : "collapsed"}`}>
+          {!showTodayTrainList ? (
+            <button className="today-train-collapsed" onClick={() => setShowTodayTrainList(true)} aria-expanded="false">
+              <span className="today-train-calendar">📅</span>
+              <span className="today-train-collapsed-text"><b>TODAY&apos;S TRAIN</b><small>{todayServiceInstances.length} trains</small></span>
+              <span className="today-train-count">{todayServiceInstances.length}</span>
+              <span className="today-train-chevron">▾</span>
+            </button>
+          ) : (
+            <>
+              <div className="today-train-box-head">
+                <div>
+                  <b>📅 TODAY&apos;S TRAIN</b>
+                  <small>{todayDate} • {todayServiceInstances.length} trains</small>
                 </div>
-                <div className="today-train-route">{first?.stationCode || "—"} <i>→</i> {last?.stationCode || "—"}</div>
-                <div className="today-train-current">{inst.currentStation}{inst.nextStation !== "—" ? <span> → {inst.nextStation}</span> : null}</div>
-                <div className="today-train-progress"><span><i style={{ width: `${inst.percent}%` }} /></span><small>{inst.percent}%</small></div>
-              </button>;
-            })}
-            {!todayServiceInstances.length && <div className="today-train-empty">No train scheduled for today.</div>}
-          </div>
+                <button className="today-train-close" onClick={() => setShowTodayTrainList(false)} title="Close train list">×</button>
+              </div>
+              <div className="today-train-box-list">
+                {todayServiceInstances.map((inst) => {
+                  const routeStations = validStations(inst.train.stations);
+                  const first = routeStations[0];
+                  const last = routeStations[routeStations.length - 1];
+                  const statusClass = inst.status === "RUNNING NOW" ? "running" : inst.status === "COMPLETED" ? "completed" : "departing";
+                  const statusText = inst.status === "RUNNING NOW" ? "RUNNING" : inst.status === "COMPLETED" ? "JOURNEY COMPLETED" : "DEPT. TODAY";
+                  return <button key={inst.key} className="today-train-row" onClick={() => inst.status === "RUNNING NOW" && setSelectedKey(inst.key)}>
+                    <div className="today-train-row-top">
+                      <b>{inst.train.trainNo}</b>
+                      <span className={`today-status ${statusClass}`}>{statusText}</span>
+                    </div>
+                    <div className="today-train-route">{first?.stationCode || "—"} <i>→</i> {last?.stationCode || "—"}</div>
+                    <div className="today-train-departure-date">Departure Date: {inst.departureDate.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })}</div>
+                    <div className="today-train-current">{inst.currentStation}{inst.nextStation !== "—" ? <span> → {inst.nextStation}</span> : null}</div>
+                    <div className="today-train-progress"><span><i style={{ width: `${inst.percent}%` }} /></span><small>{inst.percent}%</small></div>
+                  </button>;
+                })}
+                {!todayServiceInstances.length && <div className="today-train-empty">No train scheduled for today.</div>}
+              </div>
+            </>
+          )}
         </aside>
 
         {selectedInstance && <aside className="map-right-drawer">

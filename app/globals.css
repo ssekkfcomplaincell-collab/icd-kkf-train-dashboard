@@ -159,7 +159,7 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .running-dropdown-button b { display:block; color:#16283b; font-size:12px; letter-spacing:.04em; }
 .running-dropdown-button small { display:block; margin-top:2px; color:#718096; font-size:9px; }
 .running-chevron { margin-left:auto; color:#1769aa; font-size:17px; font-weight:900; }
-.running-close { margin-left:auto !important; width:27px; height:27px; padding:0 !important; border:1px solid #d8e4ec !important; background:#f7fafc !important; color:#68798b !important; border-radius:7px !important; font-size:18px !important; line-height:1; cursor:pointer; }
+.running-close { order:-1; margin-left:0 !important; margin-right:auto !important; width:27px; height:27px; padding:0 !important; border:1px solid #d8e4ec !important; background:#f7fafc !important; color:#68798b !important; border-radius:7px !important; font-size:18px !important; line-height:1; cursor:pointer; }
 .map-list-footer span:last-child { color:#1769aa; }
 @media (max-width:700px) {
   .map-only-page { padding:8px; }
@@ -227,9 +227,10 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .today-train-route { margin-top:7px; font-size:9px; font-weight:800; color:#536477; }
 .today-train-dep { margin-top:5px; font-size:8px; color:#8794a2; }
 @media (max-width:700px) {
-  .map-left-drawer.collapsed { width:165px; }
-  .today-train-drawer { top:10px; left:183px; width:165px; max-height:250px; }
-  .today-train-drawer.collapsed { width:165px; }
+  .map-left-drawer.collapsed { width:calc((100vw - 36px) / 2); max-width:165px; min-width:0; box-sizing:border-box; }
+  .today-train-drawer { top:10px; left:calc(10px + (100vw - 36px) / 2 + 8px); width:calc((100vw - 36px) / 2); max-width:165px; min-width:0; max-height:250px; box-sizing:border-box; }
+  .today-train-drawer.collapsed { width:calc((100vw - 36px) / 2); max-width:165px; min-width:0; box-sizing:border-box; }
+  .running-dropdown-button, .today-train-collapsed { box-sizing:border-box; width:100%; }
   .today-train-collapsed { min-height:70px; padding:10px 9px; gap:7px; }
   .today-train-icon { width:30px; height:30px; font-size:15px; }
   .today-train-collapsed b { font-size:10px; }

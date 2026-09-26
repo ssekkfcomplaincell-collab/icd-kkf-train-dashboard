@@ -23,6 +23,13 @@ function todayInfo() {
   const now = new Date();
   return { date: now.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }), day: WEEKDAYS[(now.getDay() + 6) % 7] };
 }
+function todayCalendarLabel() {
+  const now = new Date();
+  return {
+    day: now.toLocaleDateString("en-IN", { day: "2-digit" }),
+    month: now.toLocaleDateString("en-IN", { month: "short" }).toUpperCase(),
+  };
+}
 function wateringClass(value: string) { const v = value.toUpperCase(); if (v.includes("S/W")) return "sw"; if (v.includes("O/D")) return "od"; return ""; }
 function firstTime(stations: StationRow[], field: "arrival" | "departure") { return stations.find((s) => /^\d{1,2}:\d{2}$/.test(s[field]))?.[field] || "—"; }
 function isExcludedStation(s: StationRow) {
@@ -353,8 +360,8 @@ export default function TrainDashboard() {
         <aside className={`today-train-drawer ${showTodayTrainList ? "open" : "collapsed"}`}>
           {!showTodayTrainList ? (
             <button className="today-train-collapsed" onClick={() => setShowTodayTrainList(true)} aria-expanded="false">
-              <span className="today-train-icon">📅</span>
-              <span><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></span>
+              <span className="today-train-icon" aria-label="Today&apos;s date"><span className="today-calendar-month">{todayCalendarLabel().month}</span><strong>{todayCalendarLabel().day}</strong></span>
+              <span className="today-train-label"><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></span>
               <span className="today-train-chevron">▾</span>
             </button>
           ) : (

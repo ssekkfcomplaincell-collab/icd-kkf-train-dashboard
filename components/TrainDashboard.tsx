@@ -86,6 +86,29 @@ function activeInstances(train: Train, now: Date): ServiceInstance[] {
   return out.sort((a, b) => b.departureDate.getTime() - a.departureDate.getTime());
 }
 
+function todayServiceInstance(train: Train, now: Date): ServiceInstance | null {
+  const departureDate = atMidnight(new Date(now));
+  if (!train.runningDays?.[weekdayForDate(departureDate)]) return null;
+  const active = serviceInstance(train, departureDate, now);
+  if (active) return active;
+
+  const stations = validStations(train.stations);
+  if (stations.length < 2) return null;
+  const start = rowDateTime(stations[0], departureDate, "departure") || rowDateTime(stations[0], departureDate, "arrival");
+  const endStation = [...stations].reverse().find((s) => rowDateTime(s, departureDate, "arrival") || rowDateTime(s, departureDate, "departure"));
+  const end = endStation ? (rowDateTime(endStation, departureDate, "arrival") || rowDateTime(endStation, departureDate, "departure")) : null;
+  if (!start || !end || now <= end) return null;
+  return {
+    key: `${train.trainNo}-${dateKey(departureDate)}`,
+    train,
+    departureDate,
+    status: "COMPLETED",
+    currentStation: stations[stations.length - 1].stationName,
+    nextStation: "—",
+    percent: 100,
+  };
+}
+
 function trainDayLabel(train: Train) { const days = WEEKDAYS.filter((d) => train.runningDays?.[d]); return days.length ? days.map((d) => d.slice(0, 3)).join(" ") : "Not marked"; }
 
 export default function TrainDashboard() {
@@ -113,16 +136,9 @@ export default function TrainDashboard() {
       setError("");
       // Always render cached/local data first. Network refresh is background-only.
       // The API itself deduplicates the full Google Sheet fetch for 60 seconds.
-      const res = await fetch("/api/trains", { cache: "no-store", headers: { "Accept": "application/json" } });
-      const raw = await res.text();
-      let data: any = null;
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        const message = raw.replace(/\s+/g, " ").trim().slice(0, 500);
-        throw new Error(message || `Server returned HTTP ${res.status}`);
-      }
-      if (!res.ok || !data?.ok) throw new Error(data?.error || `Server returned HTTP ${res.status}`);
+      const res = await fetch("/api/trains", { cache: "default" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Unable to load data");
       setTrains(data.trains);
       setUpdatedAt(data.updatedAt);
       setLastRefresh(new Date().toLocaleTimeString());
@@ -187,6 +203,7 @@ export default function TrainDashboard() {
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);
   const todaysInstances = runningNowInstances;
+  const todayServiceInstances = useMemo(() => trains.map((t) => todayServiceInstance(t, now)).filter((x): x is ServiceInstance => Boolean(x)), [trains, now]);
   const todayTotalTrains = useMemo(() => trains.filter((t) => t.runningDays?.[todayDay]).length, [trains, todayDay]);
   const mapInstances = useMemo(() => runningNowInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent, currentStationName: inst.currentStation })), [todaysInstances]);
   const baseTrains = todayOnly ? trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0) : trains;
@@ -264,7 +281,7 @@ export default function TrainDashboard() {
         <span className={`live-dot ${loading ? "pulse" : ""}`} />
         <span>{loading ? "Refreshing…" : "Sheet Connected"}</span>
         <button className="theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? "☾ Dark" : "☀ Light"}</button>
-        <button className="refresh" onClick={() => void load({ silent: true, force: true })}>↻ Refresh</button>
+        <button className="refresh" onClick={() => window.location.reload()}>↻ Refresh</button>
       </div>
     </header>
 
@@ -355,11 +372,34 @@ export default function TrainDashboard() {
           )}
         </aside>
 
-        <div className="today-total-card">
-          <span className="today-total-icon">📅</span>
-          <span><b>TODAY&apos;S TOTAL</b><small>{todayTotalTrains} trains scheduled today</small></span>
-          <strong>{todayTotalTrains}</strong>
-        </div>
+        <aside className="today-train-box">
+          <div className="today-train-box-head">
+            <div>
+              <b>📅 TODAY&apos;S TRAIN</b>
+              <small>{todayDate} • {todayTotalTrains} scheduled</small>
+            </div>
+            <span className="today-train-count">{todayServiceInstances.length}</span>
+          </div>
+          <div className="today-train-box-list">
+            {todayServiceInstances.map((inst) => {
+              const routeStations = validStations(inst.train.stations);
+              const first = routeStations[0];
+              const last = routeStations[routeStations.length - 1];
+              const statusClass = inst.status === "RUNNING NOW" ? "running" : inst.status === "COMPLETED" ? "completed" : "departing";
+              const statusText = inst.status === "RUNNING NOW" ? "RUNNING" : inst.status === "COMPLETED" ? "JOURNEY COMPLETED" : "DEPT. TODAY";
+              return <button key={inst.key} className="today-train-row" onClick={() => inst.status === "RUNNING NOW" && setSelectedKey(inst.key)}>
+                <div className="today-train-row-top">
+                  <b>{inst.train.trainNo}</b>
+                  <span className={`today-status ${statusClass}`}>{statusText}</span>
+                </div>
+                <div className="today-train-route">{first?.stationCode || "—"} <i>→</i> {last?.stationCode || "—"}</div>
+                <div className="today-train-current">{inst.currentStation}{inst.nextStation !== "—" ? <span> → {inst.nextStation}</span> : null}</div>
+                <div className="today-train-progress"><span><i style={{ width: `${inst.percent}%` }} /></span><small>{inst.percent}%</small></div>
+              </button>;
+            })}
+            {!todayServiceInstances.length && <div className="today-train-empty">No train scheduled for today.</div>}
+          </div>
+        </aside>
 
         {selectedInstance && <aside className="map-right-drawer">
           <div className="drawer-head"><div><div className="drawer-title"><span className="drawer-dot" /> {selectedInstance.train.trainNo}</div><div className="drawer-route">{source?.stationName || "—"} → {destination?.stationName || "—"}</div><small>Dep {departureDate?.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small></div><button className="drawer-close" onClick={() => setSelectedKey("")}>×</button></div>

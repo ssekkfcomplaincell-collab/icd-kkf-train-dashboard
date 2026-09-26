@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo } from "react";
 import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { DivIcon } from "leaflet";
 import { StationRow } from "@/lib/types";
-import fallbackStations from "@/data/stations.json";
+import fallbackStations from "../data/stations.json";
 
 export type MapTrainInstance = {
   key: string;

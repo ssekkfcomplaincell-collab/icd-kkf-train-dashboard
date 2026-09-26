@@ -176,7 +176,8 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
   position:absolute;
   z-index:805;
   top:14px;
-  left:215px;
+  right:14px;
+  left:auto;
   width:190px;
   max-height:650px;
   display:flex;
@@ -227,15 +228,20 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .today-train-route { margin-top:7px; font-size:9px; font-weight:800; color:#536477; }
 .today-train-dep { margin-top:5px; font-size:8px; color:#8794a2; }
 @media (max-width:700px) {
-  .map-left-drawer.collapsed { width:calc((100vw - 36px) / 2); max-width:165px; min-width:0; box-sizing:border-box; }
-  .today-train-drawer { top:10px; left:calc(10px + (100vw - 36px) / 2 + 8px); width:calc((100vw - 36px) / 2); max-width:165px; min-width:0; max-height:250px; box-sizing:border-box; }
-  .today-train-drawer.collapsed { width:calc((100vw - 36px) / 2); max-width:165px; min-width:0; box-sizing:border-box; }
+  .map-left-drawer.collapsed { width:min(145px, calc((100vw - 28px) / 2)); max-width:145px; min-width:0; box-sizing:border-box; }
+  .today-train-drawer { top:10px; left:calc(10px + min(145px, calc((100vw - 28px) / 2)) + 8px); right:auto; width:min(145px, calc((100vw - 28px) / 2)); max-width:145px; min-width:0; max-height:250px; box-sizing:border-box; }
+  .today-train-drawer.collapsed { width:min(145px, calc((100vw - 28px) / 2)); max-width:145px; min-width:0; box-sizing:border-box; }
   .running-dropdown-button, .today-train-collapsed { box-sizing:border-box; width:100%; }
-  .today-train-collapsed { min-height:70px; padding:10px 9px; gap:7px; }
-  .today-train-icon { width:30px; height:30px; font-size:15px; }
-  .today-train-collapsed b { font-size:10px; }
-  .today-train-collapsed small { font-size:8px; }
-  .today-train-chevron { font-size:15px; }
+  .running-dropdown-button { min-height:58px; padding:8px 8px; gap:6px; }
+  .today-train-collapsed { min-height:58px; padding:8px 8px; gap:6px; }
+  .running-dropdown-icon { width:27px; height:27px; font-size:14px; border-radius:8px; }
+  .today-train-icon { width:27px; height:27px; font-size:14px; border-radius:8px; }
+  .running-dropdown-button b { font-size:9px; }
+  .running-dropdown-button small { font-size:7px; }
+  .today-train-collapsed b { font-size:9px; }
+  .today-train-collapsed small { font-size:7px; }
+  .running-chevron { font-size:14px; }
+  .today-train-chevron { font-size:14px; }
   .today-train-item { padding:8px; }
 }
 

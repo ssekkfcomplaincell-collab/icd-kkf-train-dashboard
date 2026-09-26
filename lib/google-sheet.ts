@@ -6,6 +6,10 @@ const SCHEDULE_SPREADSHEET_ID = "1HBFYHFkf7P5yZ2dC76FkZF5Pfe-QVtilDDFW6nTdE";
 const SCHEDULE_GID = "1463153132";
 const DEFAULT_SCHEDULE_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQXHb-McVF62fJFt1CDecykHzBwhmXnG9NrUTOyn1-iZIg2NFBZ6YySnxgwihcdvFLvMPXDk3WZ0g7z/pub?gid=1463153132&single=true&output=csv";
+const PUBLISHED_SCHEDULE_CSV_URL_ALT =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQXHb-McVF62fJFt1CDecykHzBwhmXnG9NrUTOyn1-iZIg2NFBZ6YySnxgwihcdvFLvMPXDk3WZ0g7z/pub?gid=1463153132&output=csv";
+const DIRECT_SCHEDULE_EXPORT_URL =
+  `https://docs.google.com/spreadsheets/d/${SCHEDULE_SPREADSHEET_ID}/export?format=csv&gid=${SCHEDULE_GID}`;
 const GVIZ_SCHEDULE_CSV_URL =
   `https://docs.google.com/spreadsheets/d/${SCHEDULE_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=${SCHEDULE_GID}`;
 
@@ -17,6 +21,7 @@ const DEFAULT_COORDINATES_CSV_URL =
 // Server-side cache: reuse the parsed sheets briefly to avoid duplicate requests
 // while still picking up schedule changes quickly.
 const CACHE_TTL_MS = 15_000;
+const STALE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 let trainCache: { data: Train[]; savedAt: number } | null = null;
 let trainFetchInFlight: Promise<Train[]> | null = null;
 
@@ -45,19 +50,25 @@ function isYes(value: unknown): boolean {
 
 async function fetchCsv(url: string): Promise<Record<string, unknown>[]> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
+  const timeout = setTimeout(() => controller.abort(), 30000);
   try {
     const response = await fetch(url, {
       cache: "no-store",
-      headers: { "User-Agent": "ICD-KKF-Train-Dashboard/1.0" },
+      headers: { "User-Agent": "Mozilla/5.0 ICD-KKF-Train-Dashboard/1.0" },
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const csv = await response.text();
+    const trimmed = csv.trim();
+    if (!trimmed) throw new Error("Empty response");
+    if (/^<!doctype html/i.test(trimmed) || /^<html/i.test(trimmed)) {
+      throw new Error("Received HTML instead of CSV");
+    }
     const parsed = Papa.parse<Record<string, unknown>>(csv, { header: true, skipEmptyLines: true });
     if (parsed.errors.length) {
       throw new Error(parsed.errors[0]?.message || "Invalid CSV");
     }
+    if (!parsed.data.length) throw new Error("CSV contains no data rows");
     return parsed.data;
   } finally {
     clearTimeout(timeout);
@@ -65,17 +76,25 @@ async function fetchCsv(url: string): Promise<Record<string, unknown>[]> {
 }
 
 async function fetchCsvWithFallback(urls: string[]): Promise<Record<string, unknown>[]> {
+  const uniqueUrls = [...new Set(urls.filter(Boolean))];
   const errors: string[] = [];
-  for (const url of [...new Set(urls.filter(Boolean))]) {
+
+  const attempts = uniqueUrls.map(async (url) => {
     try {
       return await fetchCsv(url);
     } catch (error) {
-      errors.push(`${url} -> ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`${url} -> ${message}`);
+      throw error;
     }
-  }
-  throw new Error(`Google Sheet fetch failed. Tried ${errors.length} source(s). ${errors.join(" | ")}`);
-}
+  });
 
+  try {
+    return await Promise.any(attempts);
+  } catch {
+    throw new Error(`Google Sheet fetch failed. Tried ${uniqueUrls.length} source(s). ${errors.join(" | ")}`);
+  }
+}
 function isExcludedRow(row: Record<string, unknown>) {
   const text = Object.values(row).map(clean).join(" ").toLowerCase();
   return text.includes("deleted") || text.includes("via station");
@@ -91,6 +110,8 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
   const scheduleRowsPromise = fetchCsvWithFallback([
     configuredScheduleUrl,
     DEFAULT_SCHEDULE_CSV_URL,
+    PUBLISHED_SCHEDULE_CSV_URL_ALT,
+    DIRECT_SCHEDULE_EXPORT_URL,
     GVIZ_SCHEDULE_CSV_URL,
   ]);
   const coordinateRowsPromise = fetchCsvWithFallback([
@@ -185,8 +206,15 @@ export async function getTrainData(options: { force?: boolean } = {}): Promise<T
 
   trainFetchInFlight = fetchAndBuildTrainData()
     .then((data) => {
+      if (!data.length) throw new Error("Google Sheet returned no train data");
       trainCache = { data, savedAt: Date.now() };
       return data;
+    })
+    .catch((error) => {
+      if (trainCache && Date.now() - trainCache.savedAt < STALE_CACHE_TTL_MS) {
+        return trainCache.data;
+      }
+      throw error;
     })
     .finally(() => {
       trainFetchInFlight = null;

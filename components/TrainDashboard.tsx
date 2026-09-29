@@ -214,7 +214,12 @@ export default function TrainDashboard() {
     }, 60_000);
     return () => window.clearInterval(refreshId);
   }, []);
-  useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(id); }, []);
+  useEffect(() => {
+    const tick = () => setNow(new Date());
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const { date: todayDate, day: todayDay } = todayInfo();
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);

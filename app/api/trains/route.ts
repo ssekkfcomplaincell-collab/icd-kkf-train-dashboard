@@ -4,7 +4,7 @@ import { getTrainData } from "@/lib/google-sheet";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 // Keep the route dynamic; Google Sheets is fetched at request time, never during build.
 

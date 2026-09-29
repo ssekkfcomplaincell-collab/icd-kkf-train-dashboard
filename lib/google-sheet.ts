@@ -166,10 +166,9 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
       clean(rawRow[rowKeys[15]]);
     const garbage = isYes(garbageValue);
 
-    // Column O = CTS Station. Mark the station as CTS covered when the
-    // corresponding cell contains YES/Y/TRUE/1.
+    // Column O = CTS Station. YES/Y/TRUE/1 means CTS Covered.
     const ctsValue =
-      pick(rawRow, ["CTS Station", "CTS", "CTS Covered", "CTS Station (YES/NO)"]) ||
+      pick(rawRow, ["CTS Station", "CTS", "CTS Station (YES/NO)"]) ||
       clean(rawRow[rowKeys[14]]);
     const cts = isYes(ctsValue);
 

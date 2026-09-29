@@ -1,15 +1,6 @@
-ICD KKF – HEADER + AUTO CLOCK FIX
+CTS Covered fix + restored original compact ICD KKF header.
 
-Files included:
-- components/TrainDashboard.tsx
-- app/globals.css (or the project's existing globals.css location)
-
-Changes:
-1. Header changed to a robust left / center / right flex layout.
-2. ICD KKF stays on the left.
-3. Live time/date stays centered.
-4. Running Trains + Dark/Light + Refresh are grouped on the RIGHT.
-5. Clock updates automatically every 1 second, so it changes without pressing Refresh.
-6. No change to train/map/watering logic.
-
-Replace the corresponding two files in the latest dashboard source.
+Column O = CTS Station; YES/Y/TRUE/1 displays CTS COVERED.
+Column P Garbage Station preserved.
+Header restored: ICD KKF left, live time/date center, Running Trains + dark/light + Refresh right.
+Replace only these 3 files. Do not replace RouteMap.tsx.

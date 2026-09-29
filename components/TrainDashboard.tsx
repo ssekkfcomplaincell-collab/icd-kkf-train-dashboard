@@ -142,7 +142,8 @@ export default function TrainDashboard() {
       setError("");
       // Always render cached/local data first. Network refresh is background-only.
       // The API itself deduplicates the full Google Sheet fetch for 60 seconds.
-      const res = await fetch("/api/trains", { cache: "default" });
+      const apiUrl = force ? `/api/trains?force=1&_=${Date.now()}` : `/api/trains?_=${Date.now()}`;
+      const res = await fetch(apiUrl, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Unable to load data");
       setTrains(data.trains);
@@ -201,7 +202,7 @@ export default function TrainDashboard() {
     }, 60_000);
     return () => window.clearInterval(refreshId);
   }, []);
-  useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(id); }, []);
+  useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(id); }, []);
 
   const { date: todayDate, day: todayDay } = todayInfo();
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
@@ -350,13 +351,13 @@ export default function TrainDashboard() {
           {!showTodayTrainList ? (
             <button className="today-train-collapsed" onClick={() => setShowTodayTrainList(true)} aria-expanded="false">
               <span className="today-train-icon">📅</span>
-              <span><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></span>
+              <span><b>TODAY&apos;S TRAIN</b><small>{todayDate} • {todaysTrainInstances.length} trains</small></span>
               <span className="today-train-chevron">▾</span>
             </button>
           ) : (
             <>
               <div className="today-train-head">
-                <div><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></div>
+                <div><b>TODAY&apos;S TRAIN</b><small>{todayDate} • {todaysTrainInstances.length} trains</small></div>
                 <button onClick={() => setShowTodayTrainList(false)} title="Close today train list">×</button>
               </div>
               <div className="today-train-list">

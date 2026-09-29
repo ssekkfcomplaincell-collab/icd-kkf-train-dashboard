@@ -201,9 +201,12 @@ export default function TrainDashboard() {
     }, 60_000);
     return () => window.clearInterval(refreshId);
   }, []);
-  useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(id); }, []);
+  useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(id); }, []);
 
   const { date: todayDate, day: todayDay } = todayInfo();
+  const liveTime = now.toLocaleTimeString("en-IN", { hour12: false });
+  const todayMonthShort = now.toLocaleDateString("en-IN", { month: "short" }).toUpperCase();
+  const todayDayNumber = String(now.getDate()).padStart(2, "0");
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);
   const todaysTrainInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW" || i.status === "DEPARTS TODAY" || i.status === "COMPLETED"), [allInstances]);
@@ -272,19 +275,21 @@ export default function TrainDashboard() {
     {error && <div className="error"><strong>Data loading error:</strong> {error}</div>}
 
     <section className="panel map-panel taptrack-shell map-only-panel">
-      <div className="map-topbar">
-        <div>
-          <h2>{todayDay} • {todayDate}</h2>
+      <div className="map-topbar icd-kkf-header">
+        <div className="kkf-brand">
+          <span className="kkf-brand-icon">🚆</span>
+          <b>ICD KKF</b>
         </div>
-        <div className="map-status">
-          <b><span className="map-live-dot" /> {todaysInstances.length} trains running</b>
-          <span>Schedule based</span>
-          <div className="map-top-actions">
-            <button className="theme-toggle map-theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>
-              {theme === "light" ? "☾" : "☀"}
-            </button>
-            <button className="refresh map-refresh" onClick={() => window.location.reload()} title="Refresh page">↻ Refresh</button>
-          </div>
+        <div className="kkf-clock">
+          <strong>{liveTime}</strong>
+          <span>{todayDay} • {todayDate}</span>
+        </div>
+        <div className="kkf-header-actions">
+          <div className="kkf-running-count"><span className="map-live-dot" /><span>Running Trains</span><b>{runningNowInstances.length}</b></div>
+          <button className="theme-toggle map-theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>
+            {theme === "light" ? "☾" : "☀"}
+          </button>
+          <button className="refresh map-refresh" onClick={() => window.location.reload()} title="Refresh page" aria-label="Refresh page">↻</button>
         </div>
       </div>
 
@@ -359,13 +364,14 @@ export default function TrainDashboard() {
         <aside className={`today-train-drawer ${showTodayTrainList ? "open" : "collapsed"}`}>
           {!showTodayTrainList ? (
             <button className="today-train-collapsed" onClick={() => setShowTodayTrainList(true)} aria-expanded="false">
-              <span className="today-train-icon">📅</span>
+              <span className="today-train-icon today-calendar"><em>{todayMonthShort}</em><b>{todayDayNumber}</b></span>
               <span><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></span>
               <span className="today-train-chevron">▾</span>
             </button>
           ) : (
             <>
               <div className="today-train-head">
+                <span className="today-calendar"><em>{todayMonthShort}</em><b>{todayDayNumber}</b></span>
                 <div><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></div>
                 <button onClick={() => setShowTodayTrainList(false)} title="Close today train list">×</button>
               </div>

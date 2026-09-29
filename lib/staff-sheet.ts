@@ -15,13 +15,14 @@ export type TrainStaff = {
   acca: StaffMember[];
 };
 
-const STAFF_PUBLISHED_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vRDL5IskL--QSgu2NgWY_F_qe4cZ7tlUYkpVlFdwIuZha-_PYcamTyZblLXtqjhzOIIdCfrslO3rKCg/pubhtml";
+// Google Sheet published-to-web URL. We intentionally use the published
+// /pub endpoint with the `sheet=` parameter instead of scraping /pubhtml.
+// /pubhtml does not reliably expose the tab list to a server-side fetch.
+const STAFF_PUBLISHED_BASE_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vRDL5IskL--QSgu2NgWY_F_qe4cZ7tlUYkpVlFdwIuZha-_PYcamTyZblLXtqjhzOIIdCfrslO3rKCg/pub";
 
 const STAFF_CACHE_TTL_MS = 60_000;
 const staffCache = new Map<string, { savedAt: number; data: TrainStaff | null }>();
-let tabMapCache: { savedAt: number; tabs: { gid: string; name: string }[] } | null = null;
-let tabMapInFlight: Promise<{ gid: string; name: string }[]> | null = null;
 
 function clean(value: unknown) {
   return String(value ?? "").replace(/\u00a0/g, " ").trim();
@@ -48,6 +49,22 @@ function dateFromIso(iso: string) {
   return `${m[3]}.${m[2]}.${m[1].slice(-2)}`;
 }
 
+function weekdayForDate(date: string) {
+  const m = normalizeDate(date).match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+  if (!m) return "";
+  const year = 2000 + Number(m[3]);
+  const month = Number(m[2]);
+  const day = Number(m[1]);
+  const names = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  return names[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+}
+
+function dateTabName(date: string) {
+  const normalized = normalizeDate(date);
+  const weekday = weekdayForDate(normalized);
+  return weekday ? `${normalized} (${weekday})` : normalized;
+}
+
 async function fetchText(url: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
@@ -62,63 +79,6 @@ async function fetchText(url: string) {
   } finally {
     clearTimeout(timeout);
   }
-}
-
-async function discoverTabs() {
-  if (tabMapCache && Date.now() - tabMapCache.savedAt < 10 * 60_000) return tabMapCache.tabs;
-  if (tabMapInFlight) return tabMapInFlight;
-
-  tabMapInFlight = fetchText(STAFF_PUBLISHED_URL)
-    .then((html) => {
-      const tabs: { gid: string; name: string }[] = [];
-      const seen = new Set<string>();
-
-      // Published Google Sheets exposes tab buttons as sheet-button-<gid>.
-      const patterns = [
-        /id=["']sheet-button-(\d+)["'][^>]*>([\s\S]*?)<\/li>/gi,
-        /id=["']sheet-button-(\d+)["'][^>]*>([\s\S]*?)<\/[^>]+>/gi,
-      ];
-      for (const re of patterns) {
-        let match: RegExpExecArray | null;
-        while ((match = re.exec(html))) {
-          const gid = match[1];
-          const name = clean(match[2].replace(/<[^>]+>/g, " "));
-          if (!seen.has(gid) && name) {
-            seen.add(gid);
-            tabs.push({ gid, name });
-          }
-        }
-      }
-
-      // Fallback: collect gid links and use nearby visible text where possible.
-      if (!tabs.length) {
-        const linkRe = /(?:href|data-gid)=["'][^"']*(?:#gid=|gid=)(\d+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi;
-        let match: RegExpExecArray | null;
-        while ((match = linkRe.exec(html))) {
-          const gid = match[1];
-          const name = clean(match[2].replace(/<[^>]+>/g, " "));
-          if (!seen.has(gid) && name) {
-            seen.add(gid);
-            tabs.push({ gid, name });
-          }
-        }
-      }
-
-      if (!tabs.length) throw new Error("No published staff sheet tabs found");
-      tabMapCache = { savedAt: Date.now(), tabs };
-      return tabs;
-    })
-    .finally(() => {
-      tabMapInFlight = null;
-    });
-
-  return tabMapInFlight;
-}
-
-function findDateTab(tabs: { gid: string; name: string }[], targetDate: string) {
-  const target = normalizeDate(targetDate);
-  if (!target) return null;
-  return tabs.find((tab) => normalizeDate(tab.name) === target) || null;
 }
 
 function nonEmpty(value: unknown) {
@@ -137,8 +97,10 @@ function uniqueMembers(items: StaffMember[]) {
   });
 }
 
-async function fetchStaffForTab(gid: string, trainNo: string, departureDate: string): Promise<TrainStaff | null> {
-  const url = `${STAFF_PUBLISHED_URL.replace(/\/pubhtml.*$/, "/pub?gid=")}${encodeURIComponent(gid)}&single=true&output=csv`;
+async function fetchStaffForDateTab(sheetName: string, trainNo: string, departureDate: string): Promise<TrainStaff | null> {
+  // Published Google Sheets supports exporting a selected tab by its name.
+  // This avoids relying on /pubhtml's internal tab-button markup.
+  const url = `${STAFF_PUBLISHED_BASE_URL}?output=csv&sheet=${encodeURIComponent(sheetName)}`;
   const csv = await fetchText(url);
   if (!csv.trim()) return null;
 
@@ -150,10 +112,9 @@ async function fetchStaffForTab(gid: string, trainNo: string, departureDate: str
   const obhs: StaffMember[] = [];
   const acca: StaffMember[] = [];
 
-  // Google Sheets exports merged cells as a value only on the first row of
-  // the merged block. In the staff sheet, TRAIN and JCO are vertically
-  // merged across all OBHS/ACCA rows for one train duty. Carry those values
-  // forward so every staff row in the block is matched.
+  // TRAIN and JCO are vertically merged in the source sheet. CSV export puts
+  // their value only on the first row of the merged block, so carry the values
+  // forward until the next explicit train/JCO block.
   let currentTrain = "";
   let currentJco = "";
 
@@ -185,7 +146,12 @@ async function fetchStaffForTab(gid: string, trainNo: string, departureDate: str
   }
 
   if (!obhs.length && !acca.length) return null;
-  return { trainNo: targetTrain, departureDate: targetDate, obhs: uniqueMembers(obhs), acca: uniqueMembers(acca) };
+  return {
+    trainNo: targetTrain,
+    departureDate: targetDate,
+    obhs: uniqueMembers(obhs),
+    acca: uniqueMembers(acca),
+  };
 }
 
 export async function getTrainStaff(trainNo: string, departureDateIso: string): Promise<TrainStaff | null> {
@@ -194,14 +160,13 @@ export async function getTrainStaff(trainNo: string, departureDateIso: string): 
   const cached = staffCache.get(key);
   if (cached && Date.now() - cached.savedAt < STAFF_CACHE_TTL_MS) return cached.data;
 
-  const tabs = await discoverTabs();
-  const tab = findDateTab(tabs, targetDate);
-  if (!tab) {
+  if (!targetDate) {
     staffCache.set(key, { savedAt: Date.now(), data: null });
     return null;
   }
 
-  const data = await fetchStaffForTab(tab.gid, trainNo, targetDate);
+  const sheetName = dateTabName(targetDate);
+  const data = await fetchStaffForDateTab(sheetName, trainNo, targetDate);
   staffCache.set(key, { savedAt: Date.now(), data });
   return data;
 }

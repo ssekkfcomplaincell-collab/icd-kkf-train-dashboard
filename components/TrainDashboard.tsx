@@ -274,7 +274,7 @@ export default function TrainDashboard() {
     <header className="icd-kkf-header">
       <div className="icd-kkf-header-left"><span className="icd-kkf-train-icon">🚆</span><b>ICD KKF</b></div>
       <div className="icd-kkf-header-center"><strong>{now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}</strong><span>{todayDay} • {todayDate}</span></div>
-      <div className="icd-kkf-header-right"><span className="icd-kkf-running"><i /> Running Trains <b>{runningNowInstances.length}</b></span><button className="icd-kkf-theme" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title="Toggle dark/light mode">{theme === "light" ? "☾" : "☀"}</button><button className="icd-kkf-refresh" onClick={() => void load({ silent: true, force: true })} title="Refresh">↻</button></div>
+      <div className="icd-kkf-header-right"><span className="icd-kkf-running"><i /> Running Trains <b>{runningNowInstances.length}</b></span><button className="icd-kkf-theme" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title="Toggle dark/light mode">{theme === "light" ? "☾" : "☀"}</button><button className="icd-kkf-refresh" onClick={() => window.location.reload()} title="Refresh page" aria-label="Refresh page">↻</button></div>
     </header>
     {error && <div className="error"><strong>Data loading error:</strong> {error}</div>}
 

@@ -4,6 +4,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { StationRow, Train, Weekday } from "@/lib/types";
+import type { TrainStaff } from "@/lib/staff-sheet";
 
 const RouteMap = dynamic(() => import("./RouteMap"), { ssr: false, loading: () => <div className="real-map map-loading">Loading India route map…</div> });
 
@@ -47,6 +48,7 @@ function rowDateTime(station: StationRow, departureDate: Date, field: "arrival" 
 function dateKey(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 function weekdayForDate(d: Date): Weekday { return WEEKDAYS[(d.getDay() + 6) % 7]; }
 function atMidnight(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function phoneHref(value: string) { const digits = String(value || "").replace(/\D/g, ""); return digits ? `tel:${digits}` : ""; }
 
 function wateringCodeForEvent(key: string) {
   let hash = 2166136261;
@@ -134,6 +136,10 @@ export default function TrainDashboard() {
   const [showRunningList, setShowRunningList] = useState(false);
   const [showTodayTrainList, setShowTodayTrainList] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [drawerTab, setDrawerTab] = useState<"route" | "contacts" | "staff" | "rm">("staff");
+  const [trainStaff, setTrainStaff] = useState<TrainStaff | null>(null);
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [staffError, setStaffError] = useState("");
 
   async function load(options: { silent?: boolean; force?: boolean } = {}) {
     const { silent = false, force = false } = options;
@@ -242,6 +248,39 @@ export default function TrainDashboard() {
   const ctsCount = valid.filter((s) => Boolean((s as StationRow & { cts?: boolean }).cts)).length;
   const mappedCount = valid.filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)).length;
   const routeDay = selectedInstance ? Math.max(1, Math.min(99, Math.floor((atMidnight(now).getTime() - atMidnight(departureDate!).getTime()) / 86400000) + 1)) : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStaff() {
+      if (!selectedInstance || !departureDate) {
+        setTrainStaff(null);
+        setStaffError("");
+        setStaffLoading(false);
+        return;
+      }
+      setStaffLoading(true);
+      setStaffError("");
+      try {
+        const params = new URLSearchParams({
+          train: selectedInstance.train.trainNo,
+          depDate: dateKey(departureDate),
+        });
+        const res = await fetch(`/api/staff?${params.toString()}`, { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || "Unable to load staff data");
+        if (!cancelled) setTrainStaff(data.staff || null);
+      } catch (e: any) {
+        if (!cancelled) {
+          setTrainStaff(null);
+          setStaffError(e?.message || "Unable to load staff data");
+        }
+      } finally {
+        if (!cancelled) setStaffLoading(false);
+      }
+    }
+    void loadStaff();
+    return () => { cancelled = true; };
+  }, [selectedInstance?.key, selectedInstance?.train.trainNo, departureDate?.getTime()]);
 
   const wateringAlerts = useMemo(() => {
     const alerts: { key: string; trainNo: string; station: StationRow; minutes: number; departureDate: Date }[] = [];
@@ -383,9 +422,48 @@ export default function TrainDashboard() {
         {selectedInstance && <aside className="map-right-drawer">
           <div className="drawer-head"><div><div className="drawer-title"><span className="drawer-dot" /> {selectedInstance.train.trainNo}</div><div className="drawer-route">{source?.stationName || "—"} → {destination?.stationName || "—"}</div><small>Dep {departureDate?.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small></div><button className="drawer-close" onClick={() => setSelectedKey("")}>×</button></div>
           <div className="drawer-progress"><div><span>{selectedInstance.currentStation} → {selectedInstance.nextStation}</span><b>{selectedInstance.percent}%</b></div><div className="drawer-track"><i style={{ width: `${selectedInstance.percent}%` }} /></div><small>Scheduled position • Day {routeDay}</small></div>
-          <div className="drawer-tabs"><b>Route</b><span>Contacts</span><span>Staff</span><span>RM</span></div>
-          <div className="drawer-note">Watering points: <b>{watering.length}</b> • S/W {swCount} • O/D {odCount} • 🗑️ Garbage {garbageCount} • ✓ CTS {ctsCount}</div>
-          <div className="drawer-stops">{valid.map((s, i) => { const st = rowDateTime(s, departureDate || now, "arrival") || rowDateTime(s, departureDate || now, "departure"); const passed = st ? now >= st : false; const isCurrent = selectedInstance.currentStation === s.stationName; const isGarbage = Boolean((s as StationRow & { garbage?: boolean }).garbage); const isCts = Boolean((s as StationRow & { cts?: boolean }).cts); return <div className={`drawer-stop ${passed ? "passed" : ""} ${isCurrent ? "current" : ""}`} key={`${s.stationCode}-${i}`}><span className="drawer-stop-dot" /> <div><b>{s.stationName} <em>{s.stationCode}</em></b><small>{s.arrival || s.departure || "—"} • Day {s.day} {s.watering ? <strong className={wateringClass(s.watering)}>{s.watering}</strong> : null} {isGarbage ? <strong className="garbage-badge">🗑️ Garbage</strong> : null} {isCts ? <strong className="cts-badge">CTS COVERED</strong> : null}</small></div></div>; })}</div>
+          <div className="drawer-tabs">
+            <button className={drawerTab === "route" ? "active" : ""} onClick={() => setDrawerTab("route")}>Route</button>
+            <button className={drawerTab === "contacts" ? "active" : ""} onClick={() => setDrawerTab("contacts")}>Contacts</button>
+            <button className={drawerTab === "staff" ? "active" : ""} onClick={() => setDrawerTab("staff")}>Staff</button>
+            <button className={drawerTab === "rm" ? "active" : ""} onClick={() => setDrawerTab("rm")}>RM</button>
+          </div>
+
+          {drawerTab === "route" && <>
+            <div className="drawer-note">Watering points: <b>{watering.length}</b> • S/W {swCount} • O/D {odCount} • 🗑️ Garbage {garbageCount} • ✓ CTS {ctsCount}</div>
+            <div className="drawer-stops">{valid.map((s, i) => { const st = rowDateTime(s, departureDate || now, "arrival") || rowDateTime(s, departureDate || now, "departure"); const passed = st ? now >= st : false; const isCurrent = selectedInstance.currentStation === s.stationName; const isGarbage = Boolean((s as StationRow & { garbage?: boolean }).garbage); const isCts = Boolean((s as StationRow & { cts?: boolean }).cts); return <div className={`drawer-stop ${passed ? "passed" : ""} ${isCurrent ? "current" : ""}`} key={`${s.stationCode}-${i}`}><span className="drawer-stop-dot" /> <div><b>{s.stationName} <em>{s.stationCode}</em></b><small>{s.arrival || s.departure || "—"} • Day {s.day} {s.watering ? <strong className={wateringClass(s.watering)}>{s.watering}</strong> : null} {isGarbage ? <strong className="garbage-badge">🗑️ Garbage</strong> : null} {isCts ? <strong className="cts-badge">CTS COVERED</strong> : null}</small></div></div>; })}</div>
+          </>}
+
+          {drawerTab === "staff" && <div className="drawer-staff-content">
+            <div className="staff-date-note">Staff for departure <b>{departureDate?.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" })}</b> • Train <b>{selectedInstance.train.trainNo}</b></div>
+            {staffLoading && <div className="staff-state">Loading staff details…</div>}
+            {!staffLoading && staffError && <div className="staff-state staff-error">{staffError}</div>}
+            {!staffLoading && !staffError && !trainStaff && <div className="staff-state">No staff record found for this train and departure date.</div>}
+            {!staffLoading && !staffError && trainStaff && <>
+              <section className="staff-group">
+                <div className="staff-group-head"><b>OBHS — On-board housekeeping</b><span>{trainStaff.obhs.length}</span></div>
+                {trainStaff.obhs.map((member, index) => <div className="staff-row" key={`obhs-${member.id}-${member.name}-${index}`}>
+                  <div className="staff-avatar">O</div>
+                  <div className="staff-main"><b>{member.name || "—"}</b><small>{member.id ? `ID ${member.id}` : "OBHS staff"}</small></div>
+                  {phoneHref(member.mobile) ? <a className="staff-phone" href={phoneHref(member.mobile)} aria-label={`Call ${member.name || "OBHS staff"} ${member.mobile}`}>📞 {member.mobile}</a> : <span className="staff-phone empty-phone">—</span>}
+                </div>)}
+                {!trainStaff.obhs.length && <div className="staff-empty">No OBHS staff listed.</div>}
+              </section>
+
+              <section className="staff-group">
+                <div className="staff-group-head"><b>ACCA — AC coach attendants</b><span>{trainStaff.acca.length} on board</span></div>
+                {trainStaff.acca.map((member, index) => <div className="staff-row" key={`acca-${member.id}-${member.name}-${index}`}>
+                  <div className="staff-avatar acca">A</div>
+                  <div className="staff-main"><b>{member.name || "—"}</b><small>{[member.id, member.coach, member.firm].filter(Boolean).join(" • ") || "ACCA staff"}</small></div>
+                  {phoneHref(member.mobile) ? <a className="staff-phone" href={phoneHref(member.mobile)} aria-label={`Call ${member.name || "ACCA staff"} ${member.mobile}`}>📞 {member.mobile}</a> : <span className="staff-phone empty-phone">—</span>}
+                </div>)}
+                {!trainStaff.acca.length && <div className="staff-empty">No ACCA staff listed.</div>}
+              </section>
+            </>}
+          </div>}
+
+          {drawerTab === "contacts" && <div className="staff-state">Contacts section is ready for contact data.</div>}
+          {drawerTab === "rm" && <div className="staff-state">RM section is ready.</div>}
         </aside>}
       </div>
     </section>

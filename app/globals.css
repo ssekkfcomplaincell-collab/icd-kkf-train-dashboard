@@ -329,3 +329,36 @@ html[data-theme="dark"] .cts-summary { background:#35255a; color:#d9c8ff; }
 .icd-kkf-header-right{display:flex;align-items:center;justify-self:end;gap:7px}.icd-kkf-running{display:flex;align-items:center;gap:6px;font-size:10px;color:#dbe7f5;white-space:nowrap}.icd-kkf-running i{width:7px;height:7px;border-radius:50%;background:#36d58a;box-shadow:0 0 0 3px rgba(54,213,138,.13)}.icd-kkf-running b{font-size:13px;color:#fff}.icd-kkf-theme,.icd-kkf-refresh{width:28px;height:28px;border:1px solid rgba(255,255,255,.13);border-radius:7px;background:rgba(255,255,255,.08);color:#fff;display:grid;place-items:center;cursor:pointer;font-size:15px;padding:0}.icd-kkf-theme:hover,.icd-kkf-refresh:hover{background:rgba(255,255,255,.16)}
 .cts-badge{display:inline-flex!important;align-items:center;padding:2px 6px;margin-left:5px;border-radius:5px;background:#e8eefc;color:#3155a6;font-size:8px!important;font-weight:800;letter-spacing:.04em;white-space:nowrap}.garbage-badge{display:inline-flex!important;align-items:center;padding:2px 6px;margin-left:5px;border-radius:5px}
 @media(max-width:700px){.icd-kkf-header{grid-template-columns:auto 1fr auto;margin:7px 7px 0;padding:8px 9px;gap:6px}.icd-kkf-header-left{font-size:14px}.icd-kkf-train-icon{width:28px;height:28px;font-size:15px}.icd-kkf-header-center strong{font-size:15px}.icd-kkf-header-center span{font-size:8px}.icd-kkf-running{font-size:0}.icd-kkf-running b{font-size:11px}.icd-kkf-theme,.icd-kkf-refresh{width:26px;height:26px;font-size:14px}}
+
+/* Existing right-side STAFF tab */
+.drawer-tabs button { padding:10px 5px; text-align:center; font-size:9px; color:#7b8795; border:0; border-right:1px solid #edf1f4; background:transparent; cursor:pointer; font-weight:700; }
+.drawer-tabs button:last-child { border-right:0; }
+.drawer-tabs button:hover { background:#f7fafc; color:var(--accent); }
+.drawer-tabs button.active { color:var(--accent); border-bottom:2px solid var(--accent); background:#fbfdff; }
+.drawer-staff-content { overflow:auto; padding:9px 12px 18px; }
+.staff-date-note { margin:0 0 9px; padding:8px 9px; border-radius:8px; background:#f4f8fb; color:#64748b; font-size:8px; line-height:1.4; }
+.staff-date-note b { color:#26384b; }
+.staff-group { margin-bottom:12px; border:1px solid var(--line); border-radius:9px; overflow:hidden; background:var(--panel); }
+.staff-group-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 9px; background:#f8fafc; border-bottom:1px solid var(--line); }
+.staff-group-head b { font-size:9px; color:#334155; }
+.staff-group-head span { font-size:8px; color:#718096; white-space:nowrap; }
+.staff-row { display:flex; align-items:center; gap:7px; min-height:48px; padding:7px 8px; border-bottom:1px solid #edf1f4; }
+.staff-row:last-child { border-bottom:0; }
+.staff-avatar { width:24px; height:24px; flex:0 0 24px; display:grid; place-items:center; border-radius:7px; background:#e8f2fb; color:#1769aa; font-size:9px; font-weight:900; }
+.staff-avatar.acca { background:#f1eafb; color:#7448a8; }
+.staff-main { min-width:0; flex:1; }
+.staff-main b { display:block; color:#26384b; font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.staff-main small { display:block; margin-top:2px; color:#8794a2; font-size:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.staff-phone { flex:0 0 auto; color:#1769aa; text-decoration:none; font-size:8px; font-weight:800; white-space:nowrap; padding:5px 6px; border-radius:6px; background:#eef7fd; }
+.staff-phone:hover { text-decoration:underline; background:#e3f2fb; }
+.empty-phone { color:#9aa5b2; background:transparent; }
+.staff-empty,.staff-state { padding:15px 8px; color:#8794a2; font-size:9px; text-align:center; }
+.staff-error { color:#b42318; }
+html[data-theme="dark"] .drawer-tabs button:hover,
+html[data-theme="dark"] .drawer-tabs button.active { background:#202832; }
+html[data-theme="dark"] .staff-date-note,
+html[data-theme="dark"] .staff-group-head { background:#202832; }
+html[data-theme="dark"] .staff-group-head b,
+html[data-theme="dark"] .staff-main b,
+html[data-theme="dark"] .staff-date-note b { color:var(--ink); }
+html[data-theme="dark"] .staff-phone { background:#18344a; color:#7fc3f8; }

@@ -15,11 +15,14 @@ export type TrainStaff = {
   acca: StaffMember[];
 };
 
-// Google Sheet published-to-web URL. We intentionally use the published
-// /pub endpoint with the `sheet=` parameter instead of scraping /pubhtml.
-// /pubhtml does not reliably expose the tab list to a server-side fetch.
-const STAFF_PUBLISHED_BASE_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vRDL5IskL--QSgu2NgWY_F_qe4cZ7tlUYkpVlFdwIuZha-_PYcamTyZblLXtqjhzOIIdCfrslO3rKCg/pub";
+// Use the actual Google Spreadsheet file ID with the Visualization (gviz)
+// endpoint. The /pub URL contains a published-token, not the real spreadsheet
+// file ID, and the published CSV endpoint is unreliable for selecting one of
+// many date tabs. gviz supports selecting a tab by its exact sheet name.
+const STAFF_SPREADSHEET_ID =
+  "1Ol32Qlh9n_fGe3SFop5iDPE4-MASmgIRt4WqaDUx3hY";
+const STAFF_GVIZ_BASE_URL =
+  `https://docs.google.com/spreadsheets/d/${STAFF_SPREADSHEET_ID}/gviz/tq`;
 
 const STAFF_CACHE_TTL_MS = 60_000;
 const staffCache = new Map<string, { savedAt: number; data: TrainStaff | null }>();
@@ -98,9 +101,9 @@ function uniqueMembers(items: StaffMember[]) {
 }
 
 async function fetchStaffForDateTab(sheetName: string, trainNo: string, departureDate: string): Promise<TrainStaff | null> {
-  // Published Google Sheets supports exporting a selected tab by its name.
-  // This avoids relying on /pubhtml's internal tab-button markup.
-  const url = `${STAFF_PUBLISHED_BASE_URL}?output=csv&sheet=${encodeURIComponent(sheetName)}`;
+  // Google Visualization can address a specific worksheet by its exact name.
+  // This is important because the staff workbook contains one tab per date.
+  const url = `${STAFF_GVIZ_BASE_URL}?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
   const csv = await fetchText(url);
   if (!csv.trim()) return null;
 

@@ -42,18 +42,18 @@ function spreadPosition(base: [number, number], sameCount: number, index: number
 
 const INDIA_BOUNDS: [[number, number], [number, number]] = [[7.8, 68.0], [37.2, 97.5]];
 
-function FitBounds({ points, selected }: { points: [number, number][], selected: boolean }) {
+function FitBounds({ points, selected, fitKey }: { points: [number, number][], selected: boolean, fitKey: string }) {
   const map = useMap();
   useEffect(() => {
     if (points.length) {
-      // When no train is selected, frame only the stations/current positions
-      // of trains that are running now. This keeps the map close to the
-      // operational area instead of showing the whole country.
+      // Fit only when the selected train or the set of running trains changes.
+      // Do NOT fit on every live-clock/current-position update; otherwise any
+      // manual zoom or pan is immediately reset back to the normal view.
       map.fitBounds(points, { padding: selected ? [45, 45] : [70, 70], maxZoom: selected ? 8 : 7.5 });
       return;
     }
     map.fitBounds(INDIA_BOUNDS, { padding: [12, 12], maxZoom: 5.6 });
-  }, [map, points, selected]);
+  }, [map, fitKey]);
   return null;
 }
 
@@ -76,20 +76,10 @@ function trainColor(index: number) {
   return colors[index % colors.length];
 }
 
-function directionDegrees(from: [number, number], to: [number, number]) {
-  const lat1 = from[0] * Math.PI / 180;
-  const lat2 = to[0] * Math.PI / 180;
-  const dLon = (to[1] - from[1]) * Math.PI / 180;
-  const y = Math.sin(dLon) * Math.cos(lat2);
-  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
-}
-
-function labelIcon(trainNo: string, color: string, selected: boolean, direction: number | null) {
-  const arrow = direction == null ? "" : `<span class="train-map-direction-arrow" style="display:inline-block;margin-left:5px;font-size:14px;font-weight:900;line-height:1;transform:rotate(${direction}deg);transform-origin:50% 50%;color:var(--train-color)">➤</span>`;
+function labelIcon(trainNo: string, color: string, selected: boolean) {
   return new DivIcon({
     className: "train-map-label-wrap",
-    html: `<div class="train-map-label ${selected ? "selected" : ""}" style="--train-color:${color}"><span class="train-map-pulse"></span><b>${trainNo}</b>${arrow}</div>`,
+    html: `<div class="train-map-label ${selected ? "selected" : ""}" style="--train-color:${color}"><span class="train-map-pulse"></span><b>${trainNo}</b></div>`,
     iconSize: [82, 30],
     iconAnchor: [41, 15],
   });
@@ -174,6 +164,10 @@ export default function RouteMap({
     })
     .filter(Boolean) as [number, number][];
   const mapFitPoints = selectedRoute?.points.length ? selectedRoute.points : runningPoints;
+  // Stable fit key: live train position/clock changes every second, but the
+  // map should not re-fit because of those updates. Re-fit only when the
+  // selected train or the set of running trains changes.
+  const fitKey = `${selectedKey}|${routes.map((r) => r.instance.key).join(",")}`;
   const center: [number, number] = [22.5, 79.0];
 
   return <div className="real-map taptrack-map">
@@ -188,7 +182,7 @@ export default function RouteMap({
       className="leaflet-map"
     >
       <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <FitBounds points={mapFitPoints} selected={Boolean(selectedRoute)} />
+      <FitBounds points={mapFitPoints} selected={Boolean(selectedRoute)} fitKey={fitKey} />
       {routes.map((route) => <Fragment key={route.instance.key}>
         {route.instance.key === selectedKey && route.solid.map((line, i) => <Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 6, opacity: 0.95 }} />)}
         {route.instance.key === selectedKey && route.dotted.map((line, i) => <Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 5, opacity: 0.8, dashArray: "7 9" }} />)}
@@ -201,8 +195,6 @@ export default function RouteMap({
           const sameStationRoutes = routes.filter((x) => x.instance.currentStationName.trim().toLowerCase() === route.instance.currentStationName.trim().toLowerCase() && x.points.length);
           const sameIndex = sameStationRoutes.findIndex((x) => x.instance.key === route.instance.key);
           const markerPosition = markerPositionBase ? spreadPosition(markerPositionBase, sameStationRoutes.length, Math.max(0, sameIndex)) : null;
-          const progressIndex = Math.max(0, Math.min(route.points.length - 2, Math.floor((route.instance.percent / 100) * (route.points.length - 1))));
-          const direction = route.points.length > 1 ? directionDegrees(route.points[progressIndex], route.points[progressIndex + 1]) : null;
           const nextWatering = nextWateringStation(route.instance.stations, route.instance.currentStationName);
           const isSelected = route.instance.key === selectedKey;
           const isVisible = !selectedKey || isSelected;
@@ -210,7 +202,7 @@ export default function RouteMap({
           if (!markerPosition) return null;
           return <Marker
             position={markerPosition}
-            icon={labelIcon(route.instance.trainNo, route.color, isSelected, direction)}
+            icon={labelIcon(route.instance.trainNo, route.color, isSelected)}
             eventHandlers={{ click: () => onTrainClick(route.instance.key) }}
             zIndexOffset={isSelected ? 1000 : 200}
           >

@@ -114,7 +114,7 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .train-hover-tooltip-content span { white-space:nowrap; }
 .taptrack-legend { left:50%; transform:translateX(-50%); bottom:12px; }
 @media (max-width:900px) { .taptrack-map-stage { height:620px; } .map-left-drawer { width:250px; } .map-right-drawer { width:330px; } }
-@media (max-width:700px) { .taptrack-map-stage { height:720px; } .map-left-drawer { top:10px; left:10px; right:10px; width:auto; max-height:250px; } .map-train-list { display:grid; grid-template-columns:1fr; } .map-right-drawer { top:270px; left:10px; right:10px; bottom:10px; width:auto; max-width:none; } .taptrack-legend { display:none; } }
+@media (max-width:700px) { .taptrack-map-stage { height:720px; } .map-left-drawer { top:10px; left:10px; right:10px; width:auto; max-height:250px; } .map-train-list { display:grid; grid-template-columns:1fr 1fr; } .map-right-drawer { top:270px; left:10px; right:10px; bottom:10px; width:auto; max-width:none; } .taptrack-legend { display:none; } }
 
 
 /* Watering point alerts: shown on the map when a train is within 20 minutes of watering */
@@ -228,10 +228,13 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .today-train-route { margin-top:7px; font-size:9px; font-weight:800; color:#536477; }
 .today-train-dep { margin-top:5px; font-size:8px; color:#8794a2; }
 @media (max-width:700px) {
-  .map-left-drawer.collapsed { width:min(145px, calc((100vw - 28px) / 2)); max-width:145px; min-width:0; box-sizing:border-box; }
+  .map-left-drawer,
+  .map-left-drawer.collapsed { width:min(145px, calc((100vw - 28px) / 2)); max-width:145px; min-width:0; box-sizing:border-box; right:auto; }
   .today-train-drawer { top:10px; left:calc(10px + min(145px, calc((100vw - 28px) / 2)) + 8px); right:auto; width:min(145px, calc((100vw - 28px) / 2)); max-width:145px; min-width:0; max-height:250px; box-sizing:border-box; }
   .today-train-drawer.collapsed { width:min(145px, calc((100vw - 28px) / 2)); max-width:145px; min-width:0; box-sizing:border-box; }
   .running-dropdown-button, .today-train-collapsed { box-sizing:border-box; width:100%; }
+  .map-left-drawer:not(.collapsed) { max-height:250px; }
+  .map-left-drawer:not(.collapsed) .map-train-list { display:block; overflow:auto; }
   .running-dropdown-button { min-height:58px; padding:8px 8px; gap:6px; }
   .today-train-collapsed { min-height:58px; padding:8px 8px; gap:6px; }
   .running-dropdown-icon { width:27px; height:27px; font-size:14px; border-radius:8px; }
@@ -312,51 +315,4 @@ html[data-theme="dark"] .leaflet-container { background:#171b20; }
 @media (max-width:700px) {
   .map-top-actions { gap:5px; }
   .map-theme-toggle { width:34px; height:34px; font-size:17px; }
-}
-
-/* ICD SBI-style compact header for ICD KKF */
-.icd-kkf-header {
-  width:100%; min-height:68px; display:flex; align-items:center; justify-content:space-between; gap:18px;
-  margin-bottom:10px; padding:10px 12px 10px 14px; border-radius:16px;
-  background:linear-gradient(135deg,#10283d,#173d5a); color:#fff;
-  box-shadow:0 10px 28px rgba(15,35,55,.18); border:1px solid rgba(255,255,255,.08);
-  box-sizing:border-box;
-}
-.icd-kkf-brand { display:flex; align-items:center; gap:10px; min-width:150px; flex:0 0 auto; }
-.icd-kkf-icon { width:40px; height:40px; display:grid; place-items:center; border-radius:11px; background:rgba(77,190,245,.15); border:1px solid rgba(112,210,255,.22); font-size:21px; }
-.icd-kkf-name { font-size:21px; font-weight:900; letter-spacing:.02em; white-space:nowrap; }
-.icd-kkf-clock { text-align:center; line-height:1.05; flex:1 1 auto; min-width:0; }
-.icd-kkf-clock strong { display:block; font-size:23px; letter-spacing:.06em; font-variant-numeric:tabular-nums; }
-.icd-kkf-clock span { display:block; margin-top:5px; color:#b9c9d8; font-size:10px; font-weight:700; letter-spacing:.04em; }
-.icd-kkf-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex:0 0 auto; margin-left:auto; }
-.icd-kkf-running { display:flex; align-items:center; gap:7px; padding:5px 9px; border-right:1px solid rgba(255,255,255,.18); }
-.icd-kkf-green-dot { width:8px; height:8px; border-radius:50%; background:#35d18c; box-shadow:0 0 0 4px rgba(53,209,140,.13); flex:0 0 auto; }
-.icd-kkf-running b { display:block; color:#b9c9d8; font-size:8px; font-weight:800; letter-spacing:.05em; }
-.icd-kkf-running strong { display:block; margin-top:1px; color:#fff; font-size:16px; line-height:1; }
-.icd-kkf-header .theme-toggle, .icd-kkf-header .refresh {
-  width:36px; height:36px; display:grid; place-items:center; padding:0; border-radius:9px;
-  border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.08); color:#fff; box-shadow:none; font-size:18px;
-  flex:0 0 auto;
-}
-.icd-kkf-header .refresh { font-size:19px; }
-.icd-kkf-header .theme-toggle:hover, .icd-kkf-header .refresh:hover { background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.3); transform:none; }
-.map-only-page { padding-top:14px; }
-.map-only-stage { height:calc(100vh - 102px); min-height:620px; }
-html[data-theme="dark"] .icd-kkf-header { background:linear-gradient(135deg,#0a1118,#102435); box-shadow:0 12px 34px rgba(0,0,0,.35); }
-@media (max-width:700px) {
-  .map-only-page { padding:8px; }
-  .icd-kkf-header { min-height:58px; gap:7px; padding:7px 8px; border-radius:12px; }
-  .icd-kkf-brand { min-width:0; gap:6px; }
-  .icd-kkf-icon { width:32px; height:32px; border-radius:8px; font-size:17px; }
-  .icd-kkf-name { font-size:15px; }
-  .icd-kkf-clock { min-width:0; }
-  .icd-kkf-clock strong { font-size:14px; letter-spacing:.03em; }
-  .icd-kkf-clock span { font-size:7px; margin-top:3px; white-space:nowrap; }
-  .icd-kkf-running { padding:3px 5px; gap:5px; }
-  .icd-kkf-running b { font-size:6px; }
-  .icd-kkf-running strong { font-size:12px; }
-  .icd-kkf-green-dot { width:6px; height:6px; box-shadow:0 0 0 3px rgba(53,209,140,.13); }
-  .icd-kkf-header .theme-toggle, .icd-kkf-header .refresh { width:30px; height:30px; font-size:15px; }
-  .icd-kkf-actions { gap:4px; }
-  .map-only-stage { height:calc(100vh - 76px); min-height:600px; }
 }

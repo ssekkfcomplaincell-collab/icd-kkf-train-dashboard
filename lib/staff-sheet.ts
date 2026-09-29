@@ -54,7 +54,7 @@ function dateFromIso(iso: string) {
 
 async function fetchText(url: string) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
+  const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
     const response = await fetch(url, {
       cache: "no-store",
@@ -145,25 +145,28 @@ async function fetchStaffForDateTab(sheetName: string, trainNo: string, departur
   const acca: StaffMember[] = [];
   let currentTrain = "";
   let currentJco = "";
+  const targetDate = normalizeDate(departureDate);
 
   for (const row of parsed.data) {
     if (!row?.length) continue;
 
     const rawTrain = clean(row[0]);
-    const explicitTrain = normalizeTrainNo(rawTrain);
+    const explicitTrain = rawTrain.match(/\d{4,6}(?:\s*\/\s*\d{1,6})?/);
     const explicitJco = normalizeDate(row[2]);
+
+    // Google Sheets uses merged cells. Only the first physical row contains
+    // TRAIN/JCO, so carry those values down until a new block starts.
     if (explicitTrain) currentTrain = rawTrain;
     if (explicitJco) currentJco = explicitJco;
 
     if (!trainMatches(currentTrain, trainNo)) continue;
 
-    // We search the tabs from the original departure date through today.
-    // Keep the JCO check strict when a JCO is present, so a later daily
-    // record for the same train cannot accidentally replace the original
-    // departure's staff.
-    if (currentJco && normalizeDate(departureDate) !== currentJco) continue;
+    // The date tab itself is already the service-date search key. If JCO is
+    // present, prefer the original departure-date match. If JCO is blank on
+    // a continuation row, keep using the block's inherited JCO.
+    if (currentJco && currentJco !== targetDate) continue;
 
-    // OBHS: D=Sr.No, E=Designation, F=ID/No, G=Name, H=Contact No.
+    // OBHS: F=ID/No, G=Name, H=Contact No.
     const obhsId = nonEmpty(row[5]);
     const obhsName = nonEmpty(row[6]);
     const obhsMobile = nonEmpty(row[7]);
@@ -171,7 +174,7 @@ async function fetchStaffForDateTab(sheetName: string, trainNo: string, departur
       obhs.push({ id: obhsId, coach: "", name: obhsName, mobile: obhsMobile, firm: "" });
     }
 
-    // ACCA: M=Sr.No, N=ID/No, O=Coach, P=Name, Q=Mobile No, R=Firm.
+    // ACCA: N=ID/No, O=Coach, P=Name, Q=Mobile No, R=Firm.
     const accaId = nonEmpty(row[13]);
     const accaCoach = nonEmpty(row[14]);
     const accaName = nonEmpty(row[15]);
@@ -185,7 +188,7 @@ async function fetchStaffForDateTab(sheetName: string, trainNo: string, departur
   if (!obhs.length && !acca.length) return null;
   return {
     trainNo: normalizeTrainNo(trainNo),
-    departureDate: normalizeDate(departureDate),
+    departureDate: targetDate,
     obhs: uniqueMembers(obhs),
     acca: uniqueMembers(acca),
   };
@@ -196,33 +199,35 @@ async function findStaffFromDepartureToToday(trainNo: string, departureDate: str
   const today = todayIndiaDate();
   if (!start || !today) return null;
 
-  // Search every date tab from the train's ORIGINAL departure date through
-  // today's date. This is intentional: staff for some running/return trains
-  // may be entered in a later date tab.
+  // Build every date from ORIGINAL departure through today. Requests are made
+  // in parallel so a few missing/non-existent tabs cannot make the Vercel API
+  // time out while waiting for each sheet one-by-one.
+  const dates: string[] = [];
   let cursor = start;
-  const results: TrainStaff[] = [];
   for (let guard = 0; guard <= 370; guard++) {
-    const sheetName = dateTabName(cursor);
-    const data = await fetchStaffForDateTab(sheetName, trainNo, start);
-    if (data) results.push(data);
-
+    dates.push(cursor);
     if (cursor === today) break;
     const next = shiftDate(cursor, 1);
     if (!next || next === cursor) break;
     cursor = next;
   }
 
-  if (!results.length) return null;
+  const results = await Promise.allSettled(
+    dates.map((date) => fetchStaffForDateTab(dateTabName(date), trainNo, start))
+  );
 
-  // If more than one matching entry exists, merge staff from all matching
-  // tabs rather than losing people because the same train was listed again.
-  const obhs = uniqueMembers(results.flatMap((item) => item.obhs));
-  const acca = uniqueMembers(results.flatMap((item) => item.acca));
+  const matches = results
+    .filter((r): r is PromiseFulfilledResult<TrainStaff | null> => r.status === "fulfilled")
+    .map((r) => r.value)
+    .filter((r): r is TrainStaff => Boolean(r));
+
+  if (!matches.length) return null;
+
   return {
     trainNo: normalizeTrainNo(trainNo),
     departureDate: start,
-    obhs,
-    acca,
+    obhs: uniqueMembers(matches.flatMap((item) => item.obhs)),
+    acca: uniqueMembers(matches.flatMap((item) => item.acca)),
   };
 }
 

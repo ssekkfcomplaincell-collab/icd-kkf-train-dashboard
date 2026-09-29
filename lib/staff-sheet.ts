@@ -52,22 +52,6 @@ function dateFromIso(iso: string) {
   return `${m[3]}.${m[2]}.${m[1].slice(-2)}`;
 }
 
-function weekdayForDate(date: string) {
-  const m = normalizeDate(date).match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
-  if (!m) return "";
-  const year = 2000 + Number(m[3]);
-  const month = Number(m[2]);
-  const day = Number(m[1]);
-  const names = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-  return names[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
-}
-
-function dateTabName(date: string) {
-  const normalized = normalizeDate(date);
-  const weekday = weekdayForDate(normalized);
-  return weekday ? `${normalized} (${weekday})` : normalized;
-}
-
 async function fetchText(url: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
@@ -100,9 +84,56 @@ function uniqueMembers(items: StaffMember[]) {
   });
 }
 
+function shiftDate(date: string, days: number) {
+  const m = normalizeDate(date).match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+  if (!m) return "";
+  const d = new Date(Date.UTC(2000 + Number(m[3]), Number(m[2]) - 1, Number(m[1])));
+  d.setUTCDate(d.getUTCDate() + days);
+  return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${String(d.getUTCFullYear() % 100).padStart(2, "0")}`;
+}
+
+function todayIndiaDate() {
+  const now = new Date();
+  const india = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  return `${String(india.getDate()).padStart(2, "0")}.${String(india.getMonth() + 1).padStart(2, "0")}.${String(india.getFullYear() % 100).padStart(2, "0")}`;
+}
+
+function trainNumbers(value: string) {
+  const text = clean(value).toUpperCase();
+  const matches = text.match(/\d{4,6}/g) || [];
+  const result = new Set<string>(matches);
+  const pair = text.match(/(\d{4,6})\/(\d{1,4})/);
+  if (pair) {
+    result.add(pair[1]);
+    const suffix = pair[2];
+    result.add(suffix.length < pair[1].length
+      ? pair[1].slice(0, pair[1].length - suffix.length) + suffix
+      : suffix);
+  }
+  return [...result];
+}
+
+function trainMatches(sheetTrain: string, requestedTrain: string) {
+  const requested = normalizeTrainNo(requestedTrain);
+  if (!requested) return false;
+  const sheetNumbers = trainNumbers(sheetTrain);
+  if (sheetNumbers.includes(requested)) return true;
+
+  // The staff sheet uses the 12934/33 block for the 12932/31 same-day pair.
+  const dynFamily = new Set(["12931", "12932", "12933", "12934"]);
+  return dynFamily.has(requested) && sheetNumbers.some((n) => dynFamily.has(n));
+}
+
+function dateTabName(date: string) {
+  const normalized = normalizeDate(date);
+  const m = normalized.match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+  if (!m) return normalized;
+  const names = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  const weekday = names[new Date(Date.UTC(2000 + Number(m[3]), Number(m[2]) - 1, Number(m[1]))).getUTCDay()];
+  return `${normalized} (${weekday})`;
+}
+
 async function fetchStaffForDateTab(sheetName: string, trainNo: string, departureDate: string): Promise<TrainStaff | null> {
-  // Google Visualization can address a specific worksheet by its exact name.
-  // This is important because the staff workbook contains one tab per date.
   const url = `${STAFF_GVIZ_BASE_URL}?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
   const csv = await fetchText(url);
   if (!csv.trim()) return null;
@@ -110,27 +141,29 @@ async function fetchStaffForDateTab(sheetName: string, trainNo: string, departur
   const parsed = Papa.parse<string[]>(csv, { header: false, skipEmptyLines: true });
   if (parsed.errors.length) throw new Error(parsed.errors[0]?.message || "Invalid staff CSV");
 
-  const targetTrain = normalizeTrainNo(trainNo);
-  const targetDate = normalizeDate(departureDate);
   const obhs: StaffMember[] = [];
   const acca: StaffMember[] = [];
-
-  // TRAIN and JCO are vertically merged in the source sheet. CSV export puts
-  // their value only on the first row of the merged block, so carry the values
-  // forward until the next explicit train/JCO block.
   let currentTrain = "";
   let currentJco = "";
 
   for (const row of parsed.data) {
     if (!row?.length) continue;
 
-    const explicitTrain = normalizeTrainNo(row[0]);
+    const rawTrain = clean(row[0]);
+    const explicitTrain = normalizeTrainNo(rawTrain);
     const explicitJco = normalizeDate(row[2]);
-    if (explicitTrain) currentTrain = explicitTrain;
+    if (explicitTrain) currentTrain = rawTrain;
     if (explicitJco) currentJco = explicitJco;
 
-    if (currentTrain !== targetTrain || currentJco !== targetDate) continue;
+    if (!trainMatches(currentTrain, trainNo)) continue;
 
+    // We search the tabs from the original departure date through today.
+    // Keep the JCO check strict when a JCO is present, so a later daily
+    // record for the same train cannot accidentally replace the original
+    // departure's staff.
+    if (currentJco && normalizeDate(departureDate) !== currentJco) continue;
+
+    // OBHS: D=Sr.No, E=Designation, F=ID/No, G=Name, H=Contact No.
     const obhsId = nonEmpty(row[5]);
     const obhsName = nonEmpty(row[6]);
     const obhsMobile = nonEmpty(row[7]);
@@ -138,22 +171,58 @@ async function fetchStaffForDateTab(sheetName: string, trainNo: string, departur
       obhs.push({ id: obhsId, coach: "", name: obhsName, mobile: obhsMobile, firm: "" });
     }
 
+    // ACCA: M=Sr.No, N=ID/No, O=Coach, P=Name, Q=Mobile No, R=Firm.
     const accaId = nonEmpty(row[13]);
     const accaCoach = nonEmpty(row[14]);
     const accaName = nonEmpty(row[15]);
     const accaMobile = nonEmpty(row[16]);
     const accaFirm = nonEmpty(row[17]);
-    if (accaId || accaCoach || accaName || accaMobile) {
+    if (accaId || accaCoach || accaName || accaMobile || accaFirm) {
       acca.push({ id: accaId, coach: accaCoach, name: accaName, mobile: accaMobile, firm: accaFirm });
     }
   }
 
   if (!obhs.length && !acca.length) return null;
   return {
-    trainNo: targetTrain,
-    departureDate: targetDate,
+    trainNo: normalizeTrainNo(trainNo),
+    departureDate: normalizeDate(departureDate),
     obhs: uniqueMembers(obhs),
     acca: uniqueMembers(acca),
+  };
+}
+
+async function findStaffFromDepartureToToday(trainNo: string, departureDate: string): Promise<TrainStaff | null> {
+  const start = normalizeDate(departureDate);
+  const today = todayIndiaDate();
+  if (!start || !today) return null;
+
+  // Search every date tab from the train's ORIGINAL departure date through
+  // today's date. This is intentional: staff for some running/return trains
+  // may be entered in a later date tab.
+  let cursor = start;
+  const results: TrainStaff[] = [];
+  for (let guard = 0; guard <= 370; guard++) {
+    const sheetName = dateTabName(cursor);
+    const data = await fetchStaffForDateTab(sheetName, trainNo, start);
+    if (data) results.push(data);
+
+    if (cursor === today) break;
+    const next = shiftDate(cursor, 1);
+    if (!next || next === cursor) break;
+    cursor = next;
+  }
+
+  if (!results.length) return null;
+
+  // If more than one matching entry exists, merge staff from all matching
+  // tabs rather than losing people because the same train was listed again.
+  const obhs = uniqueMembers(results.flatMap((item) => item.obhs));
+  const acca = uniqueMembers(results.flatMap((item) => item.acca));
+  return {
+    trainNo: normalizeTrainNo(trainNo),
+    departureDate: start,
+    obhs,
+    acca,
   };
 }
 
@@ -168,8 +237,7 @@ export async function getTrainStaff(trainNo: string, departureDateIso: string): 
     return null;
   }
 
-  const sheetName = dateTabName(targetDate);
-  const data = await fetchStaffForDateTab(sheetName, trainNo, targetDate);
+  const data = await findStaffFromDepartureToToday(trainNo, targetDate);
   staffCache.set(key, { savedAt: Date.now(), data });
   return data;
 }

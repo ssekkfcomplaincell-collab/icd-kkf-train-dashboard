@@ -150,11 +150,22 @@ async function fetchStaffForTab(gid: string, trainNo: string, departureDate: str
   const obhs: StaffMember[] = [];
   const acca: StaffMember[] = [];
 
+  // Google Sheets exports merged cells as a value only on the first row of
+  // the merged block. In the staff sheet, TRAIN and JCO are vertically
+  // merged across all OBHS/ACCA rows for one train duty. Carry those values
+  // forward so every staff row in the block is matched.
+  let currentTrain = "";
+  let currentJco = "";
+
   for (const row of parsed.data) {
     if (!row?.length) continue;
-    const rowTrain = normalizeTrainNo(row[0]);
-    const rowJco = normalizeDate(row[2]);
-    if (!rowTrain || rowTrain !== targetTrain || !rowJco || rowJco !== targetDate) continue;
+
+    const explicitTrain = normalizeTrainNo(row[0]);
+    const explicitJco = normalizeDate(row[2]);
+    if (explicitTrain) currentTrain = explicitTrain;
+    if (explicitJco) currentJco = explicitJco;
+
+    if (currentTrain !== targetTrain || currentJco !== targetDate) continue;
 
     const obhsId = nonEmpty(row[5]);
     const obhsName = nonEmpty(row[6]);

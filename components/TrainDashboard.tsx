@@ -62,8 +62,18 @@ function serviceInstance(train: Train, departureDate: Date, now: Date): ServiceI
   if (stations.length < 2) return null;
   const start = rowDateTime(stations[0], departureDate, "departure") || rowDateTime(stations[0], departureDate, "arrival");
   const endStation = [...stations].reverse().find((s) => rowDateTime(s, departureDate, "arrival") || rowDateTime(s, departureDate, "departure"));
-  const end = endStation ? (rowDateTime(endStation, departureDate, "arrival") || rowDateTime(endStation, departureDate, "departure")) : null;
-  if (!start || !end) return null;
+  const endValue = endStation ? (rowDateTime(endStation, departureDate, "arrival") || rowDateTime(endStation, departureDate, "departure")) : null;
+  if (!start || !endValue) return null;
+  let end: Date = endValue;
+
+  // Some overnight trains have all stations marked as Day 1 even though the
+  // final clock time is after midnight. Treat a clock-time rollover as the
+  // next calendar day so yesterday's departure can remain visible today.
+  while (end.getTime() < start.getTime()) {
+    const next = new Date(end);
+    next.setDate(next.getDate() + 1);
+    end = next;
+  }
 
   if (now < start) {
     if (dateKey(departureDate) !== dateKey(now)) return null;
@@ -98,7 +108,10 @@ function trainRunsOnDate(train: Train, date: Date) {
 function activeInstances(train: Train, now: Date): ServiceInstance[] {
   const stations = validStations(train.stations);
   const dayNumbers = stations.map((s) => scheduleDayNumber(s.day)).filter(Number.isFinite);
-  const maxDay = Math.max(1, ...dayNumbers);
+  const firstClock = timeToMinutes(stations[0]?.departure) ?? timeToMinutes(stations[0]?.arrival);
+  const lastClock = timeToMinutes(stations[stations.length - 1]?.arrival) ?? timeToMinutes(stations[stations.length - 1]?.departure);
+  const overnightByClock = firstClock !== null && lastClock !== null && lastClock < firstClock;
+  const maxDay = Math.max(2, ...dayNumbers, overnightByClock ? 2 : 1);
   const out: ServiceInstance[] = [];
 
   // Check every possible departure date covered by the longest schedule day.
@@ -201,12 +214,9 @@ export default function TrainDashboard() {
     }, 60_000);
     return () => window.clearInterval(refreshId);
   }, []);
-  useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(id); }, []);
+  useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(id); }, []);
 
   const { date: todayDate, day: todayDay } = todayInfo();
-  const liveTime = now.toLocaleTimeString("en-IN", { hour12: false });
-  const todayMonthShort = now.toLocaleDateString("en-IN", { month: "short" }).toUpperCase();
-  const todayDayNumber = String(now.getDate()).padStart(2, "0");
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);
   const todaysTrainInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW" || i.status === "DEPARTS TODAY" || i.status === "COMPLETED"), [allInstances]);
@@ -271,28 +281,29 @@ export default function TrainDashboard() {
   }, [runningNowInstances, now, selectedKey, wateringDismissed]);
 
 
+  const liveTime = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  const liveDate = now.toLocaleDateString("en-IN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
+
   return <main className="page map-only-page">
+    <header className="icd-kkf-header">
+      <div className="icd-kkf-brand">
+        <div className="icd-kkf-icon">🚆</div>
+        <div className="icd-kkf-name">ICD KKF</div>
+      </div>
+      <div className="icd-kkf-clock">
+        <strong>{liveTime}</strong>
+        <span>{liveDate}</span>
+      </div>
+      <div className="icd-kkf-actions">
+        <div className="icd-kkf-running"><span className="icd-kkf-green-dot" /><div><b>Running Trains</b><strong>{todaysInstances.length}</strong></div></div>
+        <button className="theme-toggle map-theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? "☾" : "☀"}</button>
+        <button className="refresh map-refresh" onClick={() => window.location.reload()} title="Refresh page" aria-label="Refresh page">↻</button>
+      </div>
+    </header>
+
     {error && <div className="error"><strong>Data loading error:</strong> {error}</div>}
 
     <section className="panel map-panel taptrack-shell map-only-panel">
-      <div className="map-topbar icd-kkf-header">
-        <div className="kkf-brand">
-          <span className="kkf-brand-icon">🚆</span>
-          <b>ICD KKF</b>
-        </div>
-        <div className="kkf-clock">
-          <strong>{liveTime}</strong>
-          <span>{todayDay} • {todayDate}</span>
-        </div>
-        <div className="kkf-header-actions">
-          <div className="kkf-running-count"><span className="map-live-dot" /><span>Running Trains</span><b>{runningNowInstances.length}</b></div>
-          <button className="theme-toggle map-theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>
-            {theme === "light" ? "☾" : "☀"}
-          </button>
-          <button className="refresh map-refresh" onClick={() => window.location.reload()} title="Refresh page" aria-label="Refresh page">↻</button>
-        </div>
-      </div>
-
       <div className="taptrack-map-stage map-only-stage">
         {wateringAlerts.length > 0 && <div className="watering-alert-stack" aria-live="polite">
           {wateringAlerts.map((alert) => {
@@ -364,14 +375,13 @@ export default function TrainDashboard() {
         <aside className={`today-train-drawer ${showTodayTrainList ? "open" : "collapsed"}`}>
           {!showTodayTrainList ? (
             <button className="today-train-collapsed" onClick={() => setShowTodayTrainList(true)} aria-expanded="false">
-              <span className="today-train-icon today-calendar"><em>{todayMonthShort}</em><b>{todayDayNumber}</b></span>
+              <span className="today-train-icon">📅</span>
               <span><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></span>
               <span className="today-train-chevron">▾</span>
             </button>
           ) : (
             <>
               <div className="today-train-head">
-                <span className="today-calendar"><em>{todayMonthShort}</em><b>{todayDayNumber}</b></span>
                 <div><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></div>
                 <button onClick={() => setShowTodayTrainList(false)} title="Close today train list">×</button>
               </div>

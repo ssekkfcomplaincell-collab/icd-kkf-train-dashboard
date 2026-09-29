@@ -1,8 +1,13 @@
-ICD / KKF UI FINAL 2
+ICD-KKF EXACT DASHBOARD BUILD FIX
 
-Changes:
-1. Refresh button performs a full page refresh with window.location.reload().
-2. Removed Fit All and Hide All controls.
-3. Removed CARTO dark tiles/API dependency. OSM tiles are used in both themes; dark mode applies a CSS dark filter to the tile layer.
-4. Added collapsible TODAY'S TRAIN panel below RUNNING on the left. It lists trains scheduled to run today and marks currently running trains.
-5. Watering alert UI remains at top-center and deterministic event code behavior is retained.
+IMPORTANT: This ZIP contains ONLY TrainDashboard.tsx.
+It is based on the latest ICD-KKF dashboard source (the version with the ICD KKF compact header, live clock/date, theme toggle, TODAY'S TRAIN, watering alerts, garbage station badges, overnight handling, etc.).
+
+Only change made:
+- Fixed TypeScript build error: 'end' is possibly 'null'.
+- Overnight train rollover logic is unchanged.
+
+Replace only:
+components/TrainDashboard.tsx
+
+DO NOT replace RouteMap.tsx or globals.css with this ZIP.

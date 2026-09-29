@@ -21,7 +21,7 @@ type ServiceInstance = {
 
 function todayInfo() {
   const now = new Date();
-  return { date: now.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }), day: WEEKDAYS[(now.getDay() + 6) % 7] };
+  return { date: now.toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }), day: WEEKDAYS[(now.getDay() + 6) % 7] };
 }
 function wateringClass(value: string) { const v = value.toUpperCase(); if (v.includes("S/W")) return "sw"; if (v.includes("O/D")) return "od"; return ""; }
 function firstTime(stations: StationRow[], field: "arrival" | "departure") { return stations.find((s) => /^\d{1,2}:\d{2}$/.test(s[field]))?.[field] || "—"; }

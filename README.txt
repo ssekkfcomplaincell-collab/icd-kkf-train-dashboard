@@ -1,15 +1,8 @@
-ICD-KKF FINAL DASHBOARD FIX
+ICD / KKF UI FINAL 2
 
-Replace these files in the project:
-- components/TrainDashboard.tsx
-- components/RouteMap.tsx
-- app/globals.css (or your existing globals.css location)
-- lib/google-sheet.ts
-- data/stations.json
-
-Google Sheet source:
-https://docs.google.com/spreadsheets/d/e/2PACX-1vQXHb-McVF62fJFt1CDecykHzBwhmXnG9NrUTOyn1-iZIg2NFBZ6YySnxgwihcdvFLvMPXDk3WZ0g7z/pub?gid=1463153132&single=true&output=csv
-
-This version uses the published CSV as the authoritative schedule source, reads Longitude from Column X and Latitude from Column Y, keeps a bundled station-coordinate fallback for blank X/Y rows, and keeps Column P Garbage Station flags.
-
-UI included: ICD KKF compact header with live time/date/running count, dark/light toggle, page refresh, RUNNING box, TODAY'S TRAIN box, watering alerts, duplicate-location marker spread, selected-route map, garbage badges, and overnight Day-1 clock-rollover handling.
+Changes:
+1. Refresh button performs a full page refresh with window.location.reload().
+2. Removed Fit All and Hide All controls.
+3. Removed CARTO dark tiles/API dependency. OSM tiles are used in both themes; dark mode applies a CSS dark filter to the tile layer.
+4. Added collapsible TODAY'S TRAIN panel below RUNNING on the left. It lists trains scheduled to run today and marks currently running trains.
+5. Watering alert UI remains at top-center and deterministic event code behavior is retained.

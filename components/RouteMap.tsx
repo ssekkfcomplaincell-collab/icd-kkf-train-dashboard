@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo } from "react";
 import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { DivIcon } from "leaflet";
 import { StationRow } from "@/lib/types";
+import fallbackStations from "../data/stations.json";
 
 export type MapTrainInstance = {
   key: string;
@@ -17,6 +18,26 @@ export type MapTrainInstance = {
 function isExcludedStation(station: StationRow) {
   const text = `${station.stationCode} ${station.stationName} ${station.trainNo} ${station.section} ${station.watering} ${station.arrival} ${station.departure}`.toLowerCase();
   return text.includes("deleted") || text.includes("via station");
+}
+
+
+function stationCoord(station: StationRow): [number, number] | null {
+  if (Number.isFinite(station.latitude) && Number.isFinite(station.longitude)) {
+    return [station.latitude as number, station.longitude as number];
+  }
+  const code = String(station.stationCode || "").trim().toUpperCase();
+  const list = fallbackStations as Array<any>;
+  const item = list.find((x) => String(x?.code || "").trim().toUpperCase() === code);
+  const lat = Number(item?.coordinates?.latitude);
+  const lon = Number(item?.coordinates?.longitude);
+  return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
+}
+
+function spreadPosition(base: [number, number], sameCount: number, index: number): [number, number] {
+  if (sameCount <= 1) return base;
+  const radius = 0.13;
+  const angle = (2 * Math.PI * index) / sameCount;
+  return [base[0] + Math.sin(angle) * radius, base[1] + Math.cos(angle) * radius];
 }
 
 const INDIA_BOUNDS: [[number, number], [number, number]] = [[7.8, 68.0], [37.2, 97.5]];
@@ -87,17 +108,18 @@ export default function RouteMap({
   onTrainClick: (key: string) => void;
 }) {
   const routes = useMemo(() => instances.map((instance, index) => {
-    const points = instance.stations
+    const mapStations = instance.stations
       .filter((s) => !isExcludedStation(s))
-      .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude))
-      .map((station) => [station.latitude as number, station.longitude as number] as [number, number]);
+      .map((station) => ({ station, coord: stationCoord(station) }))
+      .filter((x): x is { station: StationRow; coord: [number, number] } => Boolean(x.coord));
+    const points = mapStations.map((x) => x.coord);
 
     let current: [number, number] | null = null;
     const solid: [number, number][][] = [];
     const dotted: [number, number][][] = [];
 
     for (let i = 0; i < points.length - 1; i++) {
-      const stations = instance.stations.filter((s) => !isExcludedStation(s)).filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
+      const stations = mapStations.map((x) => x.station);
       const a = stations[i];
       const b = stations[i + 1];
       const dep = segmentTime(a, instance.departureDate, "departure");
@@ -115,7 +137,7 @@ export default function RouteMap({
     }
 
     if (!current && points.length) {
-      const stations = instance.stations.filter((s) => !isExcludedStation(s)).filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
+      const stations = mapStations.map((x) => x.station);
       const now = new Date();
       for (let i = 0; i < stations.length - 1; i++) {
         const dep = segmentTime(stations[i], instance.departureDate, "departure");
@@ -133,41 +155,13 @@ export default function RouteMap({
 
   const selectedRoute = routes.find((r) => r.instance.key === selectedKey);
   const visibleRoutes = selectedKey ? routes.filter((r) => r.instance.key === selectedKey) : routes;
-  const markerPositions = useMemo(() => {
-    const counts = new Map<string, number>();
-    const positions = new Map<string, [number, number]>();
-    routes.forEach((route) => {
-      const routeStations = route.instance.stations
-        .filter((s) => !isExcludedStation(s))
-        .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
-      const currentStation = routeStations.find((s) => s.stationName === route.instance.currentStationName);
-      const base = currentStation
-        ? [currentStation.latitude as number, currentStation.longitude as number] as [number, number]
-        : route.current || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))];
-      if (!base) return;
-
-      // Multiple running trains can legitimately be at the same scheduled
-      // station. Give their map labels a small deterministic spread so every
-      // running train remains visible instead of one marker covering another.
-      const groupKey = `${base[0].toFixed(4)},${base[1].toFixed(4)}`;
-      const slot = counts.get(groupKey) || 0;
-      counts.set(groupKey, slot + 1);
-      if (slot === 0) {
-        positions.set(route.instance.key, base);
-      } else {
-        const angle = (slot - 1) * (Math.PI / 3);
-        const radius = 0.045;
-        positions.set(route.instance.key, [
-          base[0] + Math.sin(angle) * radius,
-          base[1] + Math.cos(angle) * radius,
-        ]);
-      }
-    });
-    return positions;
-  }, [routes]);
-
   const runningPoints = visibleRoutes
-    .map((r) => markerPositions.get(r.instance.key))
+    .map((r) => {
+      const routeStations = r.instance.stations.filter((s) => !isExcludedStation(s));
+      const currentStation = routeStations.find((s) => s.stationName === r.instance.currentStationName);
+      const currentCoord = currentStation ? stationCoord(currentStation) : null;
+      return currentCoord || r.current || r.points[Math.max(0, Math.min(r.points.length - 1, Math.round((r.instance.percent / 100) * (r.points.length - 1))))];
+    })
     .filter(Boolean) as [number, number][];
   const mapFitPoints = selectedRoute?.points.length ? selectedRoute.points : runningPoints;
   const center: [number, number] = [22.5, 79.0];
@@ -189,17 +183,19 @@ export default function RouteMap({
         {route.instance.key === selectedKey && route.solid.map((line, i) => <Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 6, opacity: 0.95 }} />)}
         {route.instance.key === selectedKey && route.dotted.map((line, i) => <Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 5, opacity: 0.8, dashArray: "7 9" }} />)}
         {route.points.length > 0 && (() => {
-          const routeStations = route.instance.stations
-            .filter((s) => !isExcludedStation(s))
-            .filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude));
+          const routeStations = route.instance.stations.filter((s) => !isExcludedStation(s));
           const currentStation = routeStations.find((s) => s.stationName === route.instance.currentStationName);
-          const markerPosition = markerPositions.get(route.instance.key) || (currentStation
-            ? [currentStation.latitude as number, currentStation.longitude as number] as [number, number]
-            : route.current || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))]);
+          const markerPositionBase = (currentStation ? stationCoord(currentStation) : null)
+            || route.current
+            || route.points[Math.max(0, Math.min(route.points.length - 1, Math.round((route.instance.percent / 100) * (route.points.length - 1))))];
+          const sameStationRoutes = routes.filter((x) => x.instance.currentStationName.trim().toLowerCase() === route.instance.currentStationName.trim().toLowerCase() && x.points.length);
+          const sameIndex = sameStationRoutes.findIndex((x) => x.instance.key === route.instance.key);
+          const markerPosition = markerPositionBase ? spreadPosition(markerPositionBase, sameStationRoutes.length, Math.max(0, sameIndex)) : null;
           const nextWatering = nextWateringStation(route.instance.stations, route.instance.currentStationName);
           const isSelected = route.instance.key === selectedKey;
           const isVisible = !selectedKey || isSelected;
           if (!isVisible) return null;
+          if (!markerPosition) return null;
           return <Marker
             position={markerPosition}
             icon={labelIcon(route.instance.trainNo, route.color, isSelected)}

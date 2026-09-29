@@ -1,10 +1,16 @@
 import Papa from "papaparse";
 import { StationRow, Train, Weekday } from "./types";
-import fallbackStationCoordinates from "@/data/stations.json";
 
+const SCHEDULE_SPREADSHEET_ID = "1HBFYHFkf7P5yZ2dC76FkZF5Pfe-QVtilDDFW6nTdE";
 const SCHEDULE_GID = "1463153132";
 const DEFAULT_SCHEDULE_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQXHb-McVF62fJFt1CDecykHzBwhmXnG9NrUTOyn1-iZIg2NFBZ6YySnxgwihcdvFLvMPXDk3WZ0g7z/pub?gid=1463153132&single=true&output=csv";
+const PUBLISHED_SCHEDULE_CSV_URL_ALT =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQXHb-McVF62fJFt1CDecykHzBwhmXnG9NrUTOyn1-iZIg2NFBZ6YySnxgwihcdvFLvMPXDk3WZ0g7z/pub?gid=1463153132&output=csv";
+const DIRECT_SCHEDULE_EXPORT_URL =
+  `https://docs.google.com/spreadsheets/d/${SCHEDULE_SPREADSHEET_ID}/export?format=csv&gid=${SCHEDULE_GID}`;
+const GVIZ_SCHEDULE_CSV_URL =
+  `https://docs.google.com/spreadsheets/d/${SCHEDULE_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&gid=${SCHEDULE_GID}`;
 
 // Server-side cache: reuse the parsed sheets briefly to avoid duplicate requests
 // while still picking up schedule changes quickly.
@@ -91,12 +97,20 @@ function isExcludedRow(row: Record<string, unknown>) {
 async function fetchAndBuildTrainData(): Promise<Train[]> {
   const configuredScheduleUrl = (process.env.GOOGLE_SHEET_CSV_URL || "").trim();
 
-  // The published master-sheet CSV is the authoritative source. Put it first
-  // so an old Vercel environment variable can never block the current sheet.
-  const scheduleRows = await fetchCsvWithFallback([
-    DEFAULT_SCHEDULE_CSV_URL,
+  // The published CSV is the primary source. If Vercel has an old/broken
+  // GOOGLE_SHEET_CSV_URL environment variable, automatically fall back instead
+  // of failing the entire dashboard with HTTP 404.
+  const scheduleRowsPromise = fetchCsvWithFallback([
     configuredScheduleUrl,
+    DEFAULT_SCHEDULE_CSV_URL,
+    PUBLISHED_SCHEDULE_CSV_URL_ALT,
+    DIRECT_SCHEDULE_EXPORT_URL,
+    GVIZ_SCHEDULE_CSV_URL,
   ]);
+  // Coordinates are now read directly from Column X (Longitude) and
+  // Column Y (Latitude) of the same Section Wise Details / schedule sheet.
+  // No separate coordinate sheet or local JSON file is required.
+  const scheduleRows = await scheduleRowsPromise;
 
   // IMPORTANT: weekday flags live in the original Google Sheet rows and are
   // often present only on the first/source row of a train. Do NOT map them
@@ -140,23 +154,10 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
       pick(rawRow, ["Latitude", "LATITUDE", "Lat", "Y", "Latitude (Y)"]) ||
         clean(rawRow[rowKeys[24]])
     );
-    let coordinate =
+    const coordinate =
       latitude !== undefined && longitude !== undefined
         ? { latitude, longitude }
         : undefined;
-
-    // If a station row still has blank X/Y values, use the bundled station
-    // coordinate fallback. This keeps routes such as 12948 visible while the
-    // master sheet is being completed, without using a separate Google Sheet.
-    if (!coordinate && stationCode) {
-      const code = stationCode.trim().toUpperCase();
-      const fallback = (fallbackStationCoordinates as Array<{ code?: string; coordinates?: { latitude?: number; longitude?: number } }>).find(
-        (item) => String(item?.code || "").trim().toUpperCase() === code
-      )?.coordinates;
-      if (fallback && Number.isFinite(Number(fallback.latitude)) && Number.isFinite(Number(fallback.longitude))) {
-        coordinate = { latitude: Number(fallback.latitude), longitude: Number(fallback.longitude) };
-      }
-    }
 
     // Column P = Garbage Station. The user marks YES separately for each
     // train/station row, so keep the flag with the individual station.

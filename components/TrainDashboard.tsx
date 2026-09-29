@@ -48,28 +48,36 @@ function dateKey(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1
 function weekdayForDate(d: Date): Weekday { return WEEKDAYS[(d.getDay() + 6) % 7]; }
 function atMidnight(d: Date) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 
+function wateringCodeForEvent(key: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return String(100 + (Math.abs(hash) % 900));
+}
+
 function serviceInstance(train: Train, departureDate: Date, now: Date): ServiceInstance | null {
   const stations = validStations(train.stations);
   if (stations.length < 2) return null;
   const start = rowDateTime(stations[0], departureDate, "departure") || rowDateTime(stations[0], departureDate, "arrival");
   const endStation = [...stations].reverse().find((s) => rowDateTime(s, departureDate, "arrival") || rowDateTime(s, departureDate, "departure"));
-  const endValue = endStation ? (rowDateTime(endStation, departureDate, "arrival") || rowDateTime(endStation, departureDate, "departure")) : null;
-  if (!start || !endValue) return null;
-
-  // Treat an end clock time earlier than the departure clock time as an
-  // overnight journey, so trains departing yesterday can remain visible today.
-  let end: Date = endValue;
-  while (end.getTime() < start.getTime()) {
-    const next = new Date(end);
-    next.setDate(next.getDate() + 1);
-    end = next;
-  }
+  const end = endStation ? (rowDateTime(endStation, departureDate, "arrival") || rowDateTime(endStation, departureDate, "departure")) : null;
+  if (!start || !end) return null;
 
   if (now < start) {
     if (dateKey(departureDate) !== dateKey(now)) return null;
     return { key: `${train.trainNo}-${dateKey(departureDate)}`, train, departureDate, status: "DEPARTS TODAY", currentStation: stations[0].stationName, nextStation: stations[1].stationName, percent: 0 };
   }
-  if (now > end) return null;
+  if (now > end) {
+    // Keep journeys whose final scheduled time falls today in TODAY'S TRAIN.
+    // This is important for overnight trains that departed yesterday but
+    // completed their journey today.
+    if (dateKey(end) === dateKey(now)) {
+      return { key: `${train.trainNo}-${dateKey(departureDate)}`, train, departureDate, status: "COMPLETED", currentStation: endStation?.stationName || stations[stations.length - 1].stationName, nextStation: "Journey completed", percent: 100 };
+    }
+    return null;
+  }
 
   let currentIndex = 0;
   for (let i = 0; i < stations.length; i++) {
@@ -81,17 +89,28 @@ function serviceInstance(train: Train, departureDate: Date, now: Date): ServiceI
   return { key: `${train.trainNo}-${dateKey(departureDate)}`, train, departureDate, status: "RUNNING NOW", currentStation: stations[Math.min(currentIndex, stations.length - 1)].stationName, nextStation: stations[Math.min(currentIndex + 1, stations.length - 1)].stationName, percent };
 }
 
+function trainRunsOnDate(train: Train, date: Date) {
+  // RUNNING NOW must follow the Y/N weekday schedule from the Google Sheet.
+  // Never treat an unmarked train as a daily train.
+  return train.runningDays?.[weekdayForDate(date)] === true;
+}
+
 function activeInstances(train: Train, now: Date): ServiceInstance[] {
   const stations = validStations(train.stations);
-  const maxDay = Math.max(1, ...stations.map((s) => scheduleDayNumber(s.day)).filter(Number.isFinite));
+  const dayNumbers = stations.map((s) => scheduleDayNumber(s.day)).filter(Number.isFinite);
+  const maxDay = Math.max(1, ...dayNumbers);
   const out: ServiceInstance[] = [];
+
+  // Check every possible departure date covered by the longest schedule day.
+  // This keeps Day-2/Day-3 overnight services visible after midnight.
   for (let back = 0; back < maxDay; back++) {
     const depDate = atMidnight(new Date(now));
     depDate.setDate(depDate.getDate() - back);
-    if (!train.runningDays?.[weekdayForDate(depDate)]) continue;
+    if (!trainRunsOnDate(train, depDate)) continue;
     const inst = serviceInstance(train, depDate, now);
     if (inst) out.push(inst);
   }
+
   return out.sort((a, b) => b.departureDate.getTime() - a.departureDate.getTime());
 }
 
@@ -112,8 +131,9 @@ export default function TrainDashboard() {
   const [wateringCodes, setWateringCodes] = useState<Record<string, string>>({});
   const [wateringDismissed, setWateringDismissed] = useState<Record<string, boolean>>({});
   const [wateringInputs, setWateringInputs] = useState<Record<string, string>>({});
-  const [wateringAdjustments, setWateringAdjustments] = useState<Record<string, number>>({});
   const [showRunningList, setShowRunningList] = useState(false);
+  const [showTodayTrainList, setShowTodayTrainList] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   async function load(options: { silent?: boolean; force?: boolean } = {}) {
     const { silent = false, force = false } = options;
@@ -144,12 +164,19 @@ export default function TrainDashboard() {
 
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem("icd-kkf-watering-adjustments-v1");
-      if (saved) setWateringAdjustments(JSON.parse(saved));
       const savedInputs = window.localStorage.getItem("icd-kkf-watering-inputs-v1");
       if (savedInputs) setWateringInputs(JSON.parse(savedInputs));
+      const savedTheme = window.localStorage.getItem("icd-kkf-theme-v1");
+      if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme);
     } catch { /* ignore invalid local state */ }
+  }, []);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try { window.localStorage.setItem("icd-kkf-theme-v1", theme); } catch { /* ignore */ }
+  }, [theme]);
+
+  useEffect(() => {
     let hasCache = false;
     try {
       const cached = window.localStorage.getItem("icd-kkf-train-cache-v1");
@@ -174,12 +201,17 @@ export default function TrainDashboard() {
     }, 60_000);
     return () => window.clearInterval(refreshId);
   }, []);
-  useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(id); }, []);
+  useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(id); }, []);
 
   const { date: todayDate, day: todayDay } = todayInfo();
+  const liveTime = now.toLocaleTimeString("en-IN", { hour12: false });
+  const todayMonthShort = now.toLocaleDateString("en-IN", { month: "short" }).toUpperCase();
+  const todayDayNumber = String(now.getDate()).padStart(2, "0");
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);
+  const todaysTrainInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW" || i.status === "DEPARTS TODAY" || i.status === "COMPLETED"), [allInstances]);
   const todaysInstances = runningNowInstances;
+  const todayTotalTrains = useMemo(() => trains.filter((t) => t.runningDays?.[todayDay]).length, [trains, todayDay]);
   const mapInstances = useMemo(() => runningNowInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent, currentStationName: inst.currentStation })), [todaysInstances]);
   const baseTrains = todayOnly ? trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0) : trains;
 
@@ -208,6 +240,7 @@ export default function TrainDashboard() {
   const totalDistance = destination?.distance || "—";
   const swCount = watering.filter((s) => s.watering.toUpperCase().includes("S/W")).length;
   const odCount = watering.filter((s) => s.watering.toUpperCase().includes("O/D")).length;
+  const garbageCount = valid.filter((s) => Boolean((s as StationRow & { garbage?: boolean }).garbage)).length;
   const mappedCount = valid.filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)).length;
   const routeDay = selectedInstance ? Math.max(1, Math.min(99, Math.floor((atMidnight(now).getTime() - atMidnight(departureDate!).getTime()) / 86400000) + 1)) : null;
 
@@ -225,58 +258,45 @@ export default function TrainDashboard() {
         if (!eventTime) continue;
         const diff = Math.round((eventTime.getTime() - now.getTime()) / 60000);
         const key = `${inst.key}-${station.stationCode}-${i}`;
-        if (diff >= 0 && diff <= 20 && !wateringDismissed[key]) {
+        if (diff >= 0 && diff <= 20) {
           alerts.push({ key, trainNo: inst.train.trainNo, station, minutes: diff, departureDate: inst.departureDate });
         }
       }
     }
-    const visibleAlerts = selectedKey
-      ? alerts.filter((alert) => alert.key.startsWith(`${selectedKey}-`))
-      : alerts;
-    return visibleAlerts.sort((a, b) => a.minutes - b.minutes);
-  }, [runningNowInstances, now, wateringDismissed, selectedKey]);
+    const visibleAlerts = alerts.filter((alert) => !wateringDismissed[alert.key]);
+    const selectedVisible = selectedKey
+      ? visibleAlerts.filter((alert) => alert.key.startsWith(`${selectedKey}-`))
+      : visibleAlerts;
+    return selectedVisible.sort((a, b) => a.minutes - b.minutes);
+  }, [runningNowInstances, now, selectedKey, wateringDismissed]);
 
-  useEffect(() => {
-    setWateringCodes((current) => {
-      const next = { ...current };
-      for (const alert of wateringAlerts) {
-        if (!next[alert.key]) next[alert.key] = String(Math.floor(100 + Math.random() * 900));
-      }
-      return next;
-    });
-  }, [wateringAlerts]);
 
   return <main className="page map-only-page">
-    <header className="map-only-header">
-      <div>
-        <div className="eyebrow">ICD / KKF</div>
-        <h1>ICD / KKF RUNNING TRAIN DETAILS</h1>
-      </div>
-      <div className="top-actions">
-        <span className={`live-dot ${loading ? "pulse" : ""}`} />
-        <span>{loading ? "Refreshing…" : "Sheet Connected"}</span>
-        <button className="refresh" onClick={() => void load({ silent: true, force: true })}>↻ Refresh</button>
-      </div>
-    </header>
-
     {error && <div className="error"><strong>Data loading error:</strong> {error}</div>}
 
     <section className="panel map-panel taptrack-shell map-only-panel">
-      <div className="map-topbar">
-        <div>
-          <div className="panel-kicker">ICD / KKF • RUNNING TRAINS</div>
-          <h2>{todayDay} • {todayDate}</h2>
+      <div className="map-topbar icd-kkf-header">
+        <div className="kkf-brand">
+          <span className="kkf-brand-icon">🚆</span>
+          <b>ICD KKF</b>
         </div>
-        <div className="map-status">
-          <b><span className="map-live-dot" /> {todaysInstances.length} trains running</b>
-          <span>Schedule based</span>
+        <div className="kkf-clock">
+          <strong>{liveTime}</strong>
+          <span>{todayDay} • {todayDate}</span>
+        </div>
+        <div className="kkf-header-actions">
+          <div className="kkf-running-count"><span className="map-live-dot" /><span>Running Trains</span><b>{runningNowInstances.length}</b></div>
+          <button className="theme-toggle map-theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>
+            {theme === "light" ? "☾" : "☀"}
+          </button>
+          <button className="refresh map-refresh" onClick={() => window.location.reload()} title="Refresh page" aria-label="Refresh page">↻</button>
         </div>
       </div>
 
       <div className="taptrack-map-stage map-only-stage">
         {wateringAlerts.length > 0 && <div className="watering-alert-stack" aria-live="polite">
           {wateringAlerts.map((alert) => {
-            const code = wateringCodes[alert.key] || "•••";
+            const code = wateringCodeForEvent(alert.key);
             const input = wateringInputs[alert.key] || "";
             const solved = input === code;
             return <div key={alert.key} className="watering-alert">
@@ -288,12 +308,7 @@ export default function TrainDashboard() {
                 <div className="watering-code-row">
                   <span>CODE <b>{code}</b></span>
                   <input value={input} maxLength={3} inputMode="numeric" placeholder="Enter" onChange={(e) => { const value = e.target.value.replace(/\D/g, "").slice(0, 3); setWateringInputs((v) => { const next = { ...v, [alert.key]: value }; try { window.localStorage.setItem("icd-kkf-watering-inputs-v1", JSON.stringify(next)); } catch {} return next; }); }} />
-                  <button disabled={!solved} onClick={() => setWateringDismissed((v) => ({ ...v, [alert.key]: true }))}>✓</button>
-                </div>
-                <div className="watering-adjust-row">
-                  <span>TIME ADJUSTMENT</span>
-                  <b>{alert.minutes}-{wateringAdjustments[alert.key] || 0} = {Math.max(0, alert.minutes - (wateringAdjustments[alert.key] || 0))} MIN</b>
-                  <input type="number" min="0" max="999" placeholder="0" value={wateringAdjustments[alert.key] ?? ""} onChange={(e) => { const value = Math.max(0, Number(e.target.value) || 0); setWateringAdjustments((v) => { const next = { ...v, [alert.key]: value }; try { window.localStorage.setItem("icd-kkf-watering-adjustments-v1", JSON.stringify(next)); } catch {} return next; }); }} />
+                  <button disabled={!solved} title={solved ? "Code verified — close alert" : "Enter the correct code"} onClick={() => { if (solved) setWateringDismissed((v) => ({ ...v, [alert.key]: true })); }}>✓</button>
                 </div>
               </div>
               <button className="watering-alert-arrow" title="Open train route" onClick={() => setSelectedKey(`${alert.trainNo}-${dateKey(alert.departureDate)}`)}>›</button>
@@ -346,12 +361,46 @@ export default function TrainDashboard() {
           )}
         </aside>
 
+        <aside className={`today-train-drawer ${showTodayTrainList ? "open" : "collapsed"}`}>
+          {!showTodayTrainList ? (
+            <button className="today-train-collapsed" onClick={() => setShowTodayTrainList(true)} aria-expanded="false">
+              <span className="today-train-icon today-calendar"><em>{todayMonthShort}</em><b>{todayDayNumber}</b></span>
+              <span><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></span>
+              <span className="today-train-chevron">▾</span>
+            </button>
+          ) : (
+            <>
+              <div className="today-train-head">
+                <span className="today-calendar"><em>{todayMonthShort}</em><b>{todayDayNumber}</b></span>
+                <div><b>TODAY&apos;S TRAIN</b><small>{todaysTrainInstances.length} trains</small></div>
+                <button onClick={() => setShowTodayTrainList(false)} title="Close today train list">×</button>
+              </div>
+              <div className="today-train-list">
+                {todaysTrainInstances.map((inst) => {
+                  const routeStations = validStations(inst.train.stations);
+                  const first = routeStations[0];
+                  const last = routeStations[routeStations.length - 1];
+                  const statusClass = inst.status === "RUNNING NOW" ? "running" : inst.status === "COMPLETED" ? "completed" : "depart";
+                  const statusText = inst.status === "RUNNING NOW" ? "RUNNING" : inst.status === "COMPLETED" ? "JOURNEY COMPLETED" : "DEPT. TODAY";
+                  return <button key={inst.key} className="today-train-item" onClick={() => inst.status === "RUNNING NOW" && setSelectedKey(inst.key)} disabled={inst.status !== "RUNNING NOW"}>
+                    <div className="today-train-item-top"><b>{inst.train.trainNo}</b><span className={`today-status ${statusClass}`}>{statusText}</span></div>
+                    <div className="today-train-route">{first?.stationCode || "—"} → {last?.stationCode || "—"}</div>
+                    <div className="today-train-dep">Dep {inst.departureDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div>
+                  </button>;
+                })}
+                {!todaysTrainInstances.length && <div className="empty">No trains for today.</div>}
+              </div>
+            </>
+          )}
+        </aside>
+
+
         {selectedInstance && <aside className="map-right-drawer">
           <div className="drawer-head"><div><div className="drawer-title"><span className="drawer-dot" /> {selectedInstance.train.trainNo}</div><div className="drawer-route">{source?.stationName || "—"} → {destination?.stationName || "—"}</div><small>Dep {departureDate?.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small></div><button className="drawer-close" onClick={() => setSelectedKey("")}>×</button></div>
           <div className="drawer-progress"><div><span>{selectedInstance.currentStation} → {selectedInstance.nextStation}</span><b>{selectedInstance.percent}%</b></div><div className="drawer-track"><i style={{ width: `${selectedInstance.percent}%` }} /></div><small>Scheduled position • Day {routeDay}</small></div>
           <div className="drawer-tabs"><b>Route</b><span>Contacts</span><span>Staff</span><span>RM</span></div>
-          <div className="drawer-note">Watering points: <b>{watering.length}</b> • S/W {swCount} • O/D {odCount}</div>
-          <div className="drawer-stops">{valid.map((s, i) => { const st = rowDateTime(s, departureDate || now, "arrival") || rowDateTime(s, departureDate || now, "departure"); const passed = st ? now >= st : false; const isCurrent = selectedInstance.currentStation === s.stationName; return <div className={`drawer-stop ${passed ? "passed" : ""} ${isCurrent ? "current" : ""}`} key={`${s.stationCode}-${i}`}><span className="drawer-stop-dot" /> <div><b>{s.stationName} <em>{s.stationCode}</em></b><small>{s.arrival || s.departure || "—"} • Day {s.day} {s.watering ? <strong className={wateringClass(s.watering)}>{s.watering}</strong> : null}</small></div></div>; })}</div>
+          <div className="drawer-note">Watering points: <b>{watering.length}</b> • S/W {swCount} • O/D {odCount} • 🗑️ Garbage {garbageCount}</div>
+          <div className="drawer-stops">{valid.map((s, i) => { const st = rowDateTime(s, departureDate || now, "arrival") || rowDateTime(s, departureDate || now, "departure"); const passed = st ? now >= st : false; const isCurrent = selectedInstance.currentStation === s.stationName; const isGarbage = Boolean((s as StationRow & { garbage?: boolean }).garbage); return <div className={`drawer-stop ${passed ? "passed" : ""} ${isCurrent ? "current" : ""}`} key={`${s.stationCode}-${i}`}><span className="drawer-stop-dot" /> <div><b>{s.stationName} <em>{s.stationCode}</em></b><small>{s.arrival || s.departure || "—"} • Day {s.day} {s.watering ? <strong className={wateringClass(s.watering)}>{s.watering}</strong> : null} {isGarbage ? <strong className="garbage-badge">🗑️ Garbage</strong> : null}</small></div></div>; })}</div>
         </aside>}
       </div>
     </section>

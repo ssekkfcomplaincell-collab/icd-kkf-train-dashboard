@@ -62,18 +62,8 @@ function serviceInstance(train: Train, departureDate: Date, now: Date): ServiceI
   if (stations.length < 2) return null;
   const start = rowDateTime(stations[0], departureDate, "departure") || rowDateTime(stations[0], departureDate, "arrival");
   const endStation = [...stations].reverse().find((s) => rowDateTime(s, departureDate, "arrival") || rowDateTime(s, departureDate, "departure"));
-  const endValue = endStation ? (rowDateTime(endStation, departureDate, "arrival") || rowDateTime(endStation, departureDate, "departure")) : null;
-  if (!start || !endValue) return null;
-  let end: Date = endValue;
-
-  // Some overnight trains have all stations marked as Day 1 even though the
-  // final clock time is after midnight. Treat a clock-time rollover as the
-  // next calendar day so yesterday's departure can remain visible today.
-  while (end.getTime() < start.getTime()) {
-    const next = new Date(end);
-    next.setDate(next.getDate() + 1);
-    end = next;
-  }
+  const end = endStation ? (rowDateTime(endStation, departureDate, "arrival") || rowDateTime(endStation, departureDate, "departure")) : null;
+  if (!start || !end) return null;
 
   if (now < start) {
     if (dateKey(departureDate) !== dateKey(now)) return null;
@@ -108,10 +98,7 @@ function trainRunsOnDate(train: Train, date: Date) {
 function activeInstances(train: Train, now: Date): ServiceInstance[] {
   const stations = validStations(train.stations);
   const dayNumbers = stations.map((s) => scheduleDayNumber(s.day)).filter(Number.isFinite);
-  const firstClock = timeToMinutes(stations[0]?.departure) ?? timeToMinutes(stations[0]?.arrival);
-  const lastClock = timeToMinutes(stations[stations.length - 1]?.arrival) ?? timeToMinutes(stations[stations.length - 1]?.departure);
-  const overnightByClock = firstClock !== null && lastClock !== null && lastClock < firstClock;
-  const maxDay = Math.max(2, ...dayNumbers, overnightByClock ? 2 : 1);
+  const maxDay = Math.max(1, ...dayNumbers);
   const out: ServiceInstance[] = [];
 
   // Check every possible departure date covered by the longest schedule day.
@@ -214,12 +201,7 @@ export default function TrainDashboard() {
     }, 60_000);
     return () => window.clearInterval(refreshId);
   }, []);
-  useEffect(() => {
-    const tick = () => setNow(new Date());
-    tick();
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
-  }, []);
+  useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(id); }, []);
 
   const { date: todayDate, day: todayDay } = todayInfo();
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
@@ -256,6 +238,7 @@ export default function TrainDashboard() {
   const swCount = watering.filter((s) => s.watering.toUpperCase().includes("S/W")).length;
   const odCount = watering.filter((s) => s.watering.toUpperCase().includes("O/D")).length;
   const garbageCount = valid.filter((s) => Boolean((s as StationRow & { garbage?: boolean }).garbage)).length;
+  const ctsCount = valid.filter((s) => Boolean((s as StationRow & { cts?: boolean }).cts)).length;
   const mappedCount = valid.filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)).length;
   const routeDay = selectedInstance ? Math.max(1, Math.min(99, Math.floor((atMidnight(now).getTime() - atMidnight(departureDate!).getTime()) / 86400000) + 1)) : null;
 
@@ -286,29 +269,26 @@ export default function TrainDashboard() {
   }, [runningNowInstances, now, selectedKey, wateringDismissed]);
 
 
-  const liveTime = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
-  const liveDate = now.toLocaleDateString("en-IN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
-
   return <main className="page map-only-page">
-    <header className="icd-kkf-header">
-      <div className="icd-kkf-brand">
-        <div className="icd-kkf-icon">🚆</div>
-        <div className="icd-kkf-name">ICD KKF</div>
-      </div>
-      <div className="icd-kkf-clock">
-        <strong>{liveTime}</strong>
-        <span>{liveDate}</span>
-      </div>
-      <div className="icd-kkf-actions">
-        <div className="icd-kkf-running"><span className="icd-kkf-green-dot" /><div><b>Running Trains</b><strong>{todaysInstances.length}</strong></div></div>
-        <button className="theme-toggle map-theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? "☾" : "☀"}</button>
-        <button className="refresh map-refresh" onClick={() => window.location.reload()} title="Refresh page" aria-label="Refresh page">↻</button>
-      </div>
-    </header>
-
     {error && <div className="error"><strong>Data loading error:</strong> {error}</div>}
 
     <section className="panel map-panel taptrack-shell map-only-panel">
+      <div className="map-topbar">
+        <div>
+          <h2>{todayDay} • {todayDate}</h2>
+        </div>
+        <div className="map-status">
+          <b><span className="map-live-dot" /> {todaysInstances.length} trains running</b>
+          <span>Schedule based</span>
+          <div className="map-top-actions">
+            <button className="theme-toggle map-theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>
+              {theme === "light" ? "☾" : "☀"}
+            </button>
+            <button className="refresh map-refresh" onClick={() => window.location.reload()} title="Refresh page">↻ Refresh</button>
+          </div>
+        </div>
+      </div>
+
       <div className="taptrack-map-stage map-only-stage">
         {wateringAlerts.length > 0 && <div className="watering-alert-stack" aria-live="polite">
           {wateringAlerts.map((alert) => {
@@ -414,8 +394,8 @@ export default function TrainDashboard() {
           <div className="drawer-head"><div><div className="drawer-title"><span className="drawer-dot" /> {selectedInstance.train.trainNo}</div><div className="drawer-route">{source?.stationName || "—"} → {destination?.stationName || "—"}</div><small>Dep {departureDate?.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small></div><button className="drawer-close" onClick={() => setSelectedKey("")}>×</button></div>
           <div className="drawer-progress"><div><span>{selectedInstance.currentStation} → {selectedInstance.nextStation}</span><b>{selectedInstance.percent}%</b></div><div className="drawer-track"><i style={{ width: `${selectedInstance.percent}%` }} /></div><small>Scheduled position • Day {routeDay}</small></div>
           <div className="drawer-tabs"><b>Route</b><span>Contacts</span><span>Staff</span><span>RM</span></div>
-          <div className="drawer-note">Watering points: <b>{watering.length}</b> • S/W {swCount} • O/D {odCount} • 🗑️ Garbage {garbageCount}</div>
-          <div className="drawer-stops">{valid.map((s, i) => { const st = rowDateTime(s, departureDate || now, "arrival") || rowDateTime(s, departureDate || now, "departure"); const passed = st ? now >= st : false; const isCurrent = selectedInstance.currentStation === s.stationName; const isGarbage = Boolean((s as StationRow & { garbage?: boolean }).garbage); return <div className={`drawer-stop ${passed ? "passed" : ""} ${isCurrent ? "current" : ""}`} key={`${s.stationCode}-${i}`}><span className="drawer-stop-dot" /> <div><b>{s.stationName} <em>{s.stationCode}</em></b><small>{s.arrival || s.departure || "—"} • Day {s.day} {s.watering ? <strong className={wateringClass(s.watering)}>{s.watering}</strong> : null} {isGarbage ? <strong className="garbage-badge">🗑️ Garbage</strong> : null}</small></div></div>; })}</div>
+          <div className="drawer-note">Watering points: <b>{watering.length}</b> • S/W {swCount} • O/D {odCount} • 🗑️ Garbage {garbageCount} • <span className="cts-summary">CTS {ctsCount}</span></div>
+          <div className="drawer-stops">{valid.map((s, i) => { const st = rowDateTime(s, departureDate || now, "arrival") || rowDateTime(s, departureDate || now, "departure"); const passed = st ? now >= st : false; const isCurrent = selectedInstance.currentStation === s.stationName; const isGarbage = Boolean((s as StationRow & { garbage?: boolean }).garbage); const isCts = Boolean((s as StationRow & { cts?: boolean }).cts); return <div className={`drawer-stop ${passed ? "passed" : ""} ${isCurrent ? "current" : ""}`} key={`${s.stationCode}-${i}`}><span className="drawer-stop-dot" /> <div><b>{s.stationName} <em>{s.stationCode}</em></b><small>{s.arrival || s.departure || "—"} • Day {s.day} {s.watering ? <strong className={wateringClass(s.watering)}>{s.watering}</strong> : null} {isGarbage ? <strong className="garbage-badge">🗑️ Garbage</strong> : null} {isCts ? <strong className="cts-badge">CTS COVERED</strong> : null}</small></div></div>; })}</div>
         </aside>}
       </div>
     </section>

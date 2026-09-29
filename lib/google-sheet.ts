@@ -44,104 +44,51 @@ function isYes(value: unknown): boolean {
 
 async function fetchCsv(url: string): Promise<Record<string, unknown>[]> {
   const controller = new AbortController();
-  // Google published CSV can occasionally take longer than a normal API call.
-  // Keep a generous timeout, but never leave the Vercel request hanging forever.
-  const timeout = setTimeout(() => controller.abort(), 60000);
-
+  const timeout = setTimeout(() => controller.abort(), 30000);
   try {
     const response = await fetch(url, {
       cache: "no-store",
-      redirect: "follow",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; ICD-KKF-Train-Dashboard/1.0)",
-        "Accept": "text/csv,text/plain,*/*",
-      },
+      headers: { "User-Agent": "Mozilla/5.0 ICD-KKF-Train-Dashboard/1.0" },
       signal: controller.signal,
     });
-
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
     const csv = await response.text();
     const trimmed = csv.trim();
-
     if (!trimmed) throw new Error("Empty response");
     if (/^<!doctype html/i.test(trimmed) || /^<html/i.test(trimmed)) {
       throw new Error("Received HTML instead of CSV");
     }
-
-    const parsed = Papa.parse<Record<string, unknown>>(csv, {
-      header: true,
-      skipEmptyLines: true,
-    });
-
+    const parsed = Papa.parse<Record<string, unknown>>(csv, { header: true, skipEmptyLines: true });
     if (parsed.errors.length) {
       throw new Error(parsed.errors[0]?.message || "Invalid CSV");
     }
-
     if (!parsed.data.length) throw new Error("CSV contains no data rows");
     return parsed.data;
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Request timed out after 60 seconds");
-    }
-    throw error;
   } finally {
     clearTimeout(timeout);
   }
-}
-
-function isPublishedScheduleUrl(url: string): boolean {
-  return url.includes("/spreadsheets/d/e/") && url.includes("/pub");
 }
 
 async function fetchCsvWithFallback(urls: string[]): Promise<Record<string, unknown>[]> {
   const uniqueUrls = [...new Set(urls.filter(Boolean))];
   const errors: string[] = [];
 
-  /*
-   * Do NOT fire all Google URLs simultaneously.
-   *
-   * The direct /export and /gviz URLs return 404 for this published sheet,
-   * while the /d/e/.../pub CSV endpoint is the valid public source. Starting
-   * all requests with Promise.any() was also causing multiple Google requests
-   * to be aborted at the same time on Vercel.
-   *
-   * Try each source sequentially, with a small retry for transient network
-   * failures. Published CSV URLs get a cache-busting query parameter so a
-   * stale intermediary response cannot block a fresh sheet read.
-   */
-  for (const originalUrl of uniqueUrls) {
-    let lastError = "Unknown error";
-
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        let url = originalUrl;
-
-        if (isPublishedScheduleUrl(originalUrl)) {
-          const separator = originalUrl.includes("?") ? "&" : "?";
-          url = `${originalUrl}${separator}_icd_kkf_ts=${Date.now()}_${attempt}`;
-        }
-
-        return await fetchCsv(url);
-      } catch (error) {
-        lastError = error instanceof Error ? error.message : String(error);
-
-        // Retry only the same source once. This is especially useful for
-        // Google's intermittent connection/abort responses.
-        if (attempt < 2) {
-          await new Promise((resolve) => setTimeout(resolve, 700));
-        }
-      }
+  const attempts = uniqueUrls.map(async (url) => {
+    try {
+      return await fetchCsv(url);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`${url} -> ${message}`);
+      throw error;
     }
+  });
 
-    errors.push(`${originalUrl} -> ${lastError}`);
+  try {
+    return await Promise.any(attempts);
+  } catch {
+    throw new Error(`Google Sheet fetch failed. Tried ${uniqueUrls.length} source(s). ${errors.join(" | ")}`);
   }
-
-  throw new Error(
-    `Google Sheet fetch failed. Tried ${uniqueUrls.length} source(s). ${errors.join(" | ")}`
-  );
 }
-
 function isExcludedRow(row: Record<string, unknown>) {
   const text = Object.values(row).map(clean).join(" ").toLowerCase();
   return text.includes("deleted") || text.includes("via station");
@@ -154,9 +101,9 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
   // GOOGLE_SHEET_CSV_URL environment variable, automatically fall back instead
   // of failing the entire dashboard with HTTP 404.
   const scheduleRowsPromise = fetchCsvWithFallback([
+    configuredScheduleUrl,
     DEFAULT_SCHEDULE_CSV_URL,
     PUBLISHED_SCHEDULE_CSV_URL_ALT,
-    configuredScheduleUrl,
     DIRECT_SCHEDULE_EXPORT_URL,
     GVIZ_SCHEDULE_CSV_URL,
   ]);
@@ -219,6 +166,13 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
       clean(rawRow[rowKeys[15]]);
     const garbage = isYes(garbageValue);
 
+    // Column O = CTS Station. Mark the station as CTS covered when the
+    // corresponding cell contains YES/Y/TRUE/1.
+    const ctsValue =
+      pick(rawRow, ["CTS Station", "CTS", "CTS Covered", "CTS Station (YES/NO)"]) ||
+      clean(rawRow[rowKeys[14]]);
+    const cts = isYes(ctsValue);
+
     train.stations.push({
       trainNo,
       stationCode,
@@ -231,8 +185,9 @@ async function fetchAndBuildTrainData(): Promise<Train[]> {
       watering: pick(rawRow, ["Watering Station (S/W, O/D)", "Watering Station"]),
       latitude: coordinate?.latitude,
       longitude: coordinate?.longitude,
-      garbage
-    } as StationRow & { garbage?: boolean });
+      garbage,
+      cts
+    } as StationRow & { garbage?: boolean; cts?: boolean });
   }
 
   return Array.from(groups.values()).sort((a, b) =>

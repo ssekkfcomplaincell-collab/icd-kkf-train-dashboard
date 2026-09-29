@@ -148,10 +148,10 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 
 /* Map-only dashboard layout */
 .map-only-page { max-width:none; width:100%; min-height:100vh; padding:14px; }
-.map-only-header { display:flex; justify-content:space-between; align-items:center; gap:15px; margin-bottom:10px; padding:2px 4px; }
+.map-only-header { display:flex; justify-content:space-between; align-items:center; gap:15px; margin-bottom:0; padding:2px 4px; }
 .map-only-header h1 { margin:3px 0 0; font-size:24px; letter-spacing:-.03em; }
 .map-only-panel { margin:0; }
-.map-only-stage { height:calc(100vh - 92px); min-height:620px; }
+.map-only-stage { height:calc(100vh - 78px); min-height:620px; }
 .map-left-drawer.collapsed { width:190px; max-height:none; }
 .running-dropdown-button { width:100%; display:flex; align-items:center; gap:9px; border:0; background:#fff; padding:12px 13px; cursor:pointer; text-align:left; }
 .running-dropdown-button:hover { background:#f7fafc; }
@@ -165,7 +165,7 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
   .map-only-page { padding:8px; }
   .map-only-header h1 { font-size:18px; }
   .map-only-header .top-actions > span:not(.live-dot) { display:none; }
-  .map-only-stage { height:calc(100vh - 72px); min-height:600px; }
+  .map-only-stage { height:calc(100vh - 66px); min-height:600px; }
   .map-left-drawer.collapsed { width:180px; right:auto; }
 }
 

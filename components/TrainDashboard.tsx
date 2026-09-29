@@ -278,22 +278,6 @@ export default function TrainDashboard() {
     {error && <div className="error"><strong>Data loading error:</strong> {error}</div>}
 
     <section className="panel map-panel taptrack-shell map-only-panel">
-      <div className="map-topbar">
-        <div>
-          <h2>{todayDay} • {todayDate}</h2>
-        </div>
-        <div className="map-status">
-          <b><span className="map-live-dot" /> {todaysInstances.length} trains running</b>
-          <span>Schedule based</span>
-          <div className="map-top-actions">
-            <button className="theme-toggle map-theme-toggle" onClick={() => setTheme((v) => v === "light" ? "dark" : "light")} title={`Switch to ${theme === "light" ? "dark" : "light"} mode`} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>
-              {theme === "light" ? "☾" : "☀"}
-            </button>
-            <button className="refresh map-refresh" onClick={() => window.location.reload()} title="Refresh page">↻ Refresh</button>
-          </div>
-        </div>
-      </div>
-
       <div className="taptrack-map-stage map-only-stage">
         {wateringAlerts.length > 0 && <div className="watering-alert-stack" aria-live="polite">
           {wateringAlerts.map((alert) => {

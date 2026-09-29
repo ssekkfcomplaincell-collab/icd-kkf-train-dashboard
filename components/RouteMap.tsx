@@ -42,18 +42,18 @@ function spreadPosition(base: [number, number], sameCount: number, index: number
 
 const INDIA_BOUNDS: [[number, number], [number, number]] = [[7.8, 68.0], [37.2, 97.5]];
 
-function FitBounds({ points, selected }: { points: [number, number][], selected: boolean }) {
+function FitBounds({ points, selected, fitKey }: { points: [number, number][], selected: boolean, fitKey: string }) {
   const map = useMap();
   useEffect(() => {
     if (points.length) {
-      // When no train is selected, frame only the stations/current positions
-      // of trains that are running now. This keeps the map close to the
-      // operational area instead of showing the whole country.
+      // Fit only when the selected train or the set of running trains changes.
+      // Do NOT fit on every live-clock/current-position update; otherwise any
+      // manual zoom or pan is immediately reset back to the normal view.
       map.fitBounds(points, { padding: selected ? [45, 45] : [70, 70], maxZoom: selected ? 8 : 7.5 });
       return;
     }
     map.fitBounds(INDIA_BOUNDS, { padding: [12, 12], maxZoom: 5.6 });
-  }, [map, points, selected]);
+  }, [map, fitKey]);
   return null;
 }
 
@@ -164,6 +164,10 @@ export default function RouteMap({
     })
     .filter(Boolean) as [number, number][];
   const mapFitPoints = selectedRoute?.points.length ? selectedRoute.points : runningPoints;
+  // Stable fit key: live train position/clock changes every second, but the
+  // map should not re-fit because of those updates. Re-fit only when the
+  // selected train or the set of running trains changes.
+  const fitKey = `${selectedKey}|${routes.map((r) => r.instance.key).join(",")}`;
   const center: [number, number] = [22.5, 79.0];
 
   return <div className="real-map taptrack-map">
@@ -178,7 +182,7 @@ export default function RouteMap({
       className="leaflet-map"
     >
       <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <FitBounds points={mapFitPoints} selected={Boolean(selectedRoute)} />
+      <FitBounds points={mapFitPoints} selected={Boolean(selectedRoute)} fitKey={fitKey} />
       {routes.map((route) => <Fragment key={route.instance.key}>
         {route.instance.key === selectedKey && route.solid.map((line, i) => <Polyline key={`s-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 6, opacity: 0.95 }} />)}
         {route.instance.key === selectedKey && route.dotted.map((line, i) => <Polyline key={`d-${route.instance.key}-${i}`} positions={line} pathOptions={{ color: route.color, weight: 5, opacity: 0.8, dashArray: "7 9" }} />)}

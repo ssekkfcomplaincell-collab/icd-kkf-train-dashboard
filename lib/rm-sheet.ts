@@ -16,7 +16,7 @@ export type RMComplaint = {
 const RM_PUBLISHED_BASE_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxQjrt-CPq_P05ax0TySmKynwENx-T_hOVGgrMGm-TnpT1Bff1a66ezMLF21r1_b59Xn6xMhtPlFUQ/pub";
 
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 15_000;
 const cache = new Map<string, { savedAt: number; data: RMComplaint[] }>();
 
 function clean(value: unknown) {

@@ -274,14 +274,15 @@ export default function TrainDashboard() {
   useEffect(() => {
     let cancelled = false;
     async function loadMapComplaintCounts() {
-      if (!runningNowInstances.length) {
+      const source = showTodayTrainList ? todaysTrainInstances : runningNowInstances;
+      if (!source.length) {
         setRMComplaintCounts({});
         return;
       }
-      const entries = await Promise.all(runningNowInstances.map(async (inst) => {
+      const entries = await Promise.all(source.map(async (inst) => {
         try {
           const params = new URLSearchParams({ train: inst.train.trainNo, depDate: dateKey(inst.departureDate) });
-          const res = await fetch(`/api/rm?${params.toString()}`, { cache: "no-store" });
+          const res = await fetch(`/api/rm?${params.toString()}&ts=${Date.now()}`, { cache: "no-store" });
           const data = await res.json();
           if (!res.ok || !data.ok) return [inst.key, 0] as const;
           return [inst.key, Array.isArray(data.complaints) ? data.complaints.length : 0] as const;
@@ -292,8 +293,9 @@ export default function TrainDashboard() {
       if (!cancelled) setRMComplaintCounts(Object.fromEntries(entries));
     }
     void loadMapComplaintCounts();
-    return () => { cancelled = true; };
-  }, [runningNowInstances.map((x) => x.key).join("|")]);
+    const refreshId = window.setInterval(() => { void loadMapComplaintCounts(); }, 30_000);
+    return () => { cancelled = true; window.clearInterval(refreshId); };
+  }, [showTodayTrainList, runningNowInstances.map((x) => x.key).join("|"), todaysTrainInstances.map((x) => x.key).join("|")]);
 
   useEffect(() => {
     let cancelled = false;
@@ -480,7 +482,7 @@ export default function TrainDashboard() {
                   const statusClass = inst.status === "RUNNING NOW" ? "running" : inst.status === "COMPLETED" ? "completed" : "depart";
                   const statusText = inst.status === "RUNNING NOW" ? "RUNNING" : inst.status === "COMPLETED" ? "JOURNEY COMPLETED" : "DEPT. TODAY";
                   return <button key={inst.key} className="today-train-item" onClick={() => setSelectedKey(inst.key)}>
-                    <div className="today-train-item-top"><b>{inst.train.trainNo}</b><span className={`today-status ${statusClass}`}>{statusText}</span></div>
+                    <div className="today-train-item-top"><span className="today-train-number"><b>{inst.train.trainNo}</b>{(rmComplaintCounts[inst.key] || 0) > 0 && <span className="today-rm-count">RMCS - {rmComplaintCounts[inst.key]}</span>}</span><span className={`today-status ${statusClass}`}>{statusText}</span></div>
                     <div className="today-train-route">{first?.stationCode || "—"} → {last?.stationCode || "—"}</div>
                     <div className="today-train-dep">Dep {inst.departureDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div>
                   </button>;

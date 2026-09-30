@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo } from "react";
-import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Marker, Polyline, TileLayer, useMap } from "react-leaflet";
 import { DivIcon } from "leaflet";
 import { StationRow } from "@/lib/types";
 import fallbackStations from "../data/stations.json";
@@ -83,22 +83,10 @@ function complaintIcon(count: number, color: string) {
     className: "train-map-complaint-wrap",
     html: `<div class="train-map-complaint-only" style="--train-color:${color}">${count}</div>`,
     iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconAnchor: [14, 31],
   });
 }
 
-function nextWateringStation(stations: StationRow[], currentStationName: string) {
-  const routeStations = stations.filter((s) => !isExcludedStation(s));
-  const currentIndex = routeStations.findIndex((s) =>
-    s.stationName.trim().toLowerCase() === currentStationName.trim().toLowerCase()
-  );
-  const startIndex = currentIndex >= 0 ? currentIndex + 1 : 0;
-  return routeStations.slice(startIndex).find((s) => s.watering?.trim()) || null;
-}
-
-function formatDepartureDate(date: Date) {
-  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
 
 export default function RouteMap({
   instances,
@@ -203,7 +191,6 @@ export default function RouteMap({
           const sameStationRoutes = routes.filter((x) => x.instance.currentStationName.trim().toLowerCase() === route.instance.currentStationName.trim().toLowerCase() && x.points.length);
           const sameIndex = sameStationRoutes.findIndex((x) => x.instance.key === route.instance.key);
           const markerPosition = markerPositionBase ? spreadPosition(markerPositionBase, sameStationRoutes.length, Math.max(0, sameIndex)) : null;
-          const nextWatering = nextWateringStation(route.instance.stations, route.instance.currentStationName);
           const isSelected = route.instance.key === selectedKey;
           const isVisible = !selectedKey || isSelected;
           if (!isVisible) return null;
@@ -214,16 +201,7 @@ export default function RouteMap({
               radius={isSelected ? 9 : 7}
               pathOptions={{ color: route.color, weight: 2, fillOpacity: 0.95 }}
               eventHandlers={{ click: () => onTrainClick(route.instance.key) }}
-            >
-              <Tooltip direction="top" offset={[0, -8]} opacity={1} className="train-hover-tooltip">
-                <div className="train-hover-tooltip-content">
-                  <b>Train {route.instance.trainNo}</b>
-                  <span>Departure: {formatDepartureDate(route.instance.departureDate)}</span>
-                  <span>Current: {route.instance.currentStationName}</span>
-                  <span>Next Watering: {nextWatering ? `${nextWatering.stationName} • ${nextWatering.watering}` : "None"}</span>
-                </div>
-              </Tooltip>
-            </CircleMarker>
+            />
             {route.instance.complaintCount && route.instance.complaintCount > 0 ? (
               <Marker
                 position={markerPosition}
@@ -237,6 +215,6 @@ export default function RouteMap({
         {route.instance.key === selectedKey && route.points.map((point, i) => <CircleMarker key={`p-${route.instance.key}-${i}`} center={point} radius={4} pathOptions={{ color: route.color, weight: 1, fillOpacity: .85 }} eventHandlers={{ click: () => onTrainClick(route.instance.key) }} />)}
       </Fragment>)}
     </MapContainer>
-    <div className="map-overlay-legend taptrack-legend"><span><i className="solid-swatch" /> Completed</span><span><i className="dotted-swatch" /> Pending</span><span>● Click train number for route</span></div>
+    <div className="map-overlay-legend taptrack-legend"><span><i className="solid-swatch" /> Completed</span><span><i className="dotted-swatch" /> Pending</span><span>● Click train marker for route</span></div>
   </div>;
 }

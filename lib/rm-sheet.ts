@@ -16,6 +16,13 @@ export type RMComplaint = {
 const RM_PUBLISHED_BASE_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vTxQjrt-CPq_P05ax0TySmKynwENx-T_hOVGgrMGm-TnpT1Bff1a66ezMLF21r1_b59Xn6xMhtPlFUQ/pub";
 
+// The normal Google Sheet URL supplied for the RailMadad workbook.
+// gviz is used as an additional fallback when the published workbook does
+// not expose a tab through its /pub HTML navigation.
+const RM_SHEET_ID = "14jrzX7yaNnZ1worcs0VVFB137IajuntRHiBm6hsdTIU";
+const RM_GVIZ_BASE_URL =
+  `https://docs.google.com/spreadsheets/d/${RM_SHEET_ID}/gviz/tq`;
+
 const CACHE_TTL_MS = 15_000;
 const cache = new Map<string, { savedAt: number; data: RMComplaint[] }>();
 const publishedGidCache = new Map<string, string>();
@@ -153,20 +160,32 @@ async function discoverPublishedGid(sheetName: string) {
 async function fetchDateTab(sheetName: string, targetTrain: string, targetDepDate: string): Promise<RMComplaint[]> {
   let csv = "";
 
-  // The reliable published CSV form for a specific Google Sheets tab uses
-  // its numeric gid. Discover that gid from the published workbook first.
-  // Keep the sheet-name form as a fallback because older published sheets
-  // may still accept it.
+  // Same approach as the Staff sheet: use the real Google Spreadsheet ID
+  // and gviz with the exact date-tab name. This means newly created tabs such
+  // as 01.10.26 are picked up automatically without adding a new GID to code.
   try {
-    const gid = await discoverPublishedGid(sheetName);
-    if (gid) csv = await fetchCsvByGid(gid);
+    const url = `${RM_GVIZ_BASE_URL}?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&_ts=${Date.now()}`;
+    csv = await fetchText(url);
   } catch {
-    // Try the legacy sheet-name endpoint below.
+    // Fall back to the published workbook endpoints for older/public tabs.
+  }
+
+  if (!csv.trim()) {
+    try {
+      const gid = await discoverPublishedGid(sheetName);
+      if (gid) csv = await fetchCsvByGid(gid);
+    } catch {
+      // Continue to the legacy published sheet-name endpoint.
+    }
   }
 
   if (!csv.trim()) {
     const url = `${RM_PUBLISHED_BASE_URL}?output=csv&sheet=${encodeURIComponent(sheetName)}&single=true&_ts=${Date.now()}`;
-    csv = await fetchText(url);
+    try {
+      csv = await fetchText(url);
+    } catch {
+      return [];
+    }
   }
   if (!csv.trim()) return [];
 
@@ -177,6 +196,9 @@ async function fetchDateTab(sheetName: string, targetTrain: string, targetDepDat
   for (const row of parsed.data) {
     if (!row?.length) continue;
 
+    // IMPORTANT: RM matching uses the actual values in each complaint row.
+    // D = DEP. DATE and H = TRAIN NO. Do not carry either value down from
+    // another row, because blank H rows must never be assigned to a train.
     const explicitDepDate = normalizeDate(row[3]); // Column D = DEP. DATE
     const explicitTrain = clean(row[7]); // Column H = TRAIN NO.
     if (!explicitDepDate || normalizeDate(explicitDepDate) !== normalizeDate(targetDepDate)) continue;

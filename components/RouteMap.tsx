@@ -13,6 +13,7 @@ export type MapTrainInstance = {
   departureDate: Date;
   percent: number;
   currentStationName: string;
+  status: "DEPARTS TODAY" | "RUNNING NOW" | "COMPLETED";
   complaintCount?: number;
 };
 
@@ -77,12 +78,12 @@ function trainColor(index: number) {
   return colors[index % colors.length];
 }
 
-function labelIcon(trainNo: string, color: string, selected: boolean, complaintCount = 0) {
+function complaintIcon(count: number, color: string) {
   return new DivIcon({
-    className: "train-map-label-wrap",
-    html: `<div class="train-map-label ${selected ? "selected" : ""}" style="--train-color:${color}"><span class="train-map-pulse"></span>${complaintCount > 0 ? `<span class="train-map-complaint-count">${complaintCount}</span>` : ""}<b>${trainNo}</b></div>`,
-    iconSize: [82, 42],
-    iconAnchor: [41, 21],
+    className: "train-map-complaint-wrap",
+    html: `<div class="train-map-complaint-only" style="--train-color:${color}">${count}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
   });
 }
 
@@ -119,34 +120,40 @@ export default function RouteMap({
     const solid: [number, number][][] = [];
     const dotted: [number, number][][] = [];
 
-    for (let i = 0; i < points.length - 1; i++) {
-      const stations = mapStations.map((x) => x.station);
-      const a = stations[i];
-      const b = stations[i + 1];
-      const dep = segmentTime(a, instance.departureDate, "departure");
-      const arr = segmentTime(b, instance.departureDate, "arrival");
-      if (!dep || !arr) { dotted.push([points[i], points[i + 1]]); continue; }
-      const now = new Date();
-      if (now >= arr) solid.push([points[i], points[i + 1]]);
-      else if (now <= dep) dotted.push([points[i], points[i + 1]]);
-      else {
-        const ratio = Math.max(0, Math.min(1, (now.getTime() - dep.getTime()) / Math.max(1, arr.getTime() - dep.getTime())));
-        current = interpolate(points[i], points[i + 1], ratio);
-        solid.push([points[i], current]);
-        dotted.push([current, points[i + 1]]);
-      }
-    }
-
-    if (!current && points.length) {
-      const stations = mapStations.map((x) => x.station);
-      const now = new Date();
-      for (let i = 0; i < stations.length - 1; i++) {
-        const dep = segmentTime(stations[i], instance.departureDate, "departure");
-        const arr = segmentTime(stations[i + 1], instance.departureDate, "arrival");
-        if (dep && arr && now >= dep && now < arr) {
+    if (instance.status === "COMPLETED") {
+      for (let i = 0; i < points.length - 1; i++) solid.push([points[i], points[i + 1]]);
+    } else if (instance.status === "DEPARTS TODAY") {
+      for (let i = 0; i < points.length - 1; i++) dotted.push([points[i], points[i + 1]]);
+    } else {
+      for (let i = 0; i < points.length - 1; i++) {
+        const stations = mapStations.map((x) => x.station);
+        const a = stations[i];
+        const b = stations[i + 1];
+        const dep = segmentTime(a, instance.departureDate, "departure");
+        const arr = segmentTime(b, instance.departureDate, "arrival");
+        if (!dep || !arr) { dotted.push([points[i], points[i + 1]]); continue; }
+        const now = new Date();
+        if (now >= arr) solid.push([points[i], points[i + 1]]);
+        else if (now <= dep) dotted.push([points[i], points[i + 1]]);
+        else {
           const ratio = Math.max(0, Math.min(1, (now.getTime() - dep.getTime()) / Math.max(1, arr.getTime() - dep.getTime())));
           current = interpolate(points[i], points[i + 1], ratio);
-          break;
+          solid.push([points[i], current]);
+          dotted.push([current, points[i + 1]]);
+        }
+      }
+
+      if (!current && points.length) {
+        const stations = mapStations.map((x) => x.station);
+        const now = new Date();
+        for (let i = 0; i < stations.length - 1; i++) {
+          const dep = segmentTime(stations[i], instance.departureDate, "departure");
+          const arr = segmentTime(stations[i + 1], instance.departureDate, "arrival");
+          if (dep && arr && now >= dep && now < arr) {
+            const ratio = Math.max(0, Math.min(1, (now.getTime() - dep.getTime()) / Math.max(1, arr.getTime() - dep.getTime())));
+            current = interpolate(points[i], points[i + 1], ratio);
+            break;
+          }
         }
       }
     }
@@ -201,21 +208,31 @@ export default function RouteMap({
           const isVisible = !selectedKey || isSelected;
           if (!isVisible) return null;
           if (!markerPosition) return null;
-          return <Marker
-            position={markerPosition}
-            icon={labelIcon(route.instance.trainNo, route.color, isSelected, route.instance.complaintCount || 0)}
-            eventHandlers={{ click: () => onTrainClick(route.instance.key) }}
-            zIndexOffset={isSelected ? 1000 : 200}
-          >
-            <Tooltip direction="top" offset={[0, -16]} opacity={1} className="train-hover-tooltip">
-              <div className="train-hover-tooltip-content">
-                <b>Train {route.instance.trainNo}</b>
-                <span>Departure: {formatDepartureDate(route.instance.departureDate)}</span>
-                <span>Current: {route.instance.currentStationName}</span>
-                <span>Next Watering: {nextWatering ? `${nextWatering.stationName} • ${nextWatering.watering}` : "None"}</span>
-              </div>
-            </Tooltip>
-          </Marker>;
+          return <Fragment>
+            <CircleMarker
+              center={markerPosition}
+              radius={isSelected ? 9 : 7}
+              pathOptions={{ color: route.color, weight: 2, fillOpacity: 0.95 }}
+              eventHandlers={{ click: () => onTrainClick(route.instance.key) }}
+            >
+              <Tooltip direction="top" offset={[0, -8]} opacity={1} className="train-hover-tooltip">
+                <div className="train-hover-tooltip-content">
+                  <b>Train {route.instance.trainNo}</b>
+                  <span>Departure: {formatDepartureDate(route.instance.departureDate)}</span>
+                  <span>Current: {route.instance.currentStationName}</span>
+                  <span>Next Watering: {nextWatering ? `${nextWatering.stationName} • ${nextWatering.watering}` : "None"}</span>
+                </div>
+              </Tooltip>
+            </CircleMarker>
+            {route.instance.complaintCount && route.instance.complaintCount > 0 ? (
+              <Marker
+                position={markerPosition}
+                icon={complaintIcon(route.instance.complaintCount, route.color)}
+                eventHandlers={{ click: () => onTrainClick(route.instance.key) }}
+                zIndexOffset={isSelected ? 1200 : 900}
+              />
+            ) : null}
+          </Fragment>;
         })()}
         {route.instance.key === selectedKey && route.points.map((point, i) => <CircleMarker key={`p-${route.instance.key}-${i}`} center={point} radius={4} pathOptions={{ color: route.color, weight: 1, fillOpacity: .85 }} eventHandlers={{ click: () => onTrainClick(route.instance.key) }} />)}
       </Fragment>)}

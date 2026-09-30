@@ -380,3 +380,19 @@ html[data-theme="dark"] .rm-table tbody tr:hover { background:#202832; }
 .train-map-label.selected { box-shadow: 0 0 0 3px rgba(23,105,170,.20), 0 3px 10px rgba(0,0,0,.25); }
 .train-map-complaint-count { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); min-width: 22px; height: 22px; padding: 0 6px; border-radius: 50%; background: #fff; border: 2px solid var(--train-color); color: #111827; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; line-height: 1; box-shadow: 0 1px 5px rgba(0,0,0,.24); z-index: 3; }
 .train-map-pulse { position: absolute; left: 8px; width: 9px; height: 9px; border-radius: 50%; background: var(--train-color); }
+
+/* Mobile: show one running train card per row, matching the Today's Train card width. */
+@media (max-width:700px) {
+  .map-train-list { display:grid; grid-template-columns:1fr; }
+  .map-train-card { width:100%; box-sizing:border-box; }
+}
+
+/* Map: no train-number labels; only a complaint-count circle is shown when count > 0. */
+.train-map-complaint-wrap { background:transparent !important; border:0 !important; }
+.train-map-complaint-only {
+  width:28px; height:28px; box-sizing:border-box; border-radius:50%;
+  background:#fff; border:3px solid var(--train-color); color:#111827;
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:900; line-height:1;
+  box-shadow:0 2px 7px rgba(0,0,0,.25);
+}

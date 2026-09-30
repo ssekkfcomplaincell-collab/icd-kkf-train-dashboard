@@ -116,12 +116,12 @@ function trainNumbers(value: string) {
 function trainMatches(sheetTrain: string, requestedTrain: string) {
   const requested = normalizeTrainNo(requestedTrain);
   if (!requested) return false;
-  const sheetNumbers = trainNumbers(sheetTrain);
-  if (sheetNumbers.includes(requested)) return true;
 
-  // The staff sheet uses the 12934/33 block for the 12932/31 same-day pair.
-  const dynFamily = new Set(["12931", "12932", "12933", "12934"]);
-  return dynFamily.has(requested) && sheetNumbers.some((n) => dynFamily.has(n));
+  // Match only the exact train number(s) written in the sheet block.
+  // Example: 12934/33 must match 12934 or 12933, but it must NOT match
+  // the separate 12932/31 block. This prevents staff from two different
+  // train blocks being merged into each other.
+  return trainNumbers(sheetTrain).includes(requested);
 }
 
 function dateTabName(date: string) {

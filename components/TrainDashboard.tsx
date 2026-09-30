@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { StationRow, Train, Weekday } from "@/lib/types";
 import type { TrainStaff } from "@/lib/staff-sheet";
+import type { RMComplaint } from "@/lib/rm-sheet";
 
 const RouteMap = dynamic(() => import("./RouteMap"), { ssr: false, loading: () => <div className="real-map map-loading">Loading India route map…</div> });
 
@@ -140,6 +141,10 @@ export default function TrainDashboard() {
   const [trainStaff, setTrainStaff] = useState<TrainStaff | null>(null);
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
+  const [rmComplaints, setRMComplaints] = useState<RMComplaint[]>([]);
+  const [rmLoading, setRMLoading] = useState(false);
+  const [rmError, setRMError] = useState("");
+  const [rmComplaintCounts, setRMComplaintCounts] = useState<Record<string, number>>({});
 
   async function load(options: { silent?: boolean; force?: boolean } = {}) {
     const { silent = false, force = false } = options;
@@ -216,7 +221,7 @@ export default function TrainDashboard() {
   const todaysTrainInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW" || i.status === "DEPARTS TODAY" || i.status === "COMPLETED"), [allInstances]);
   const todaysInstances = runningNowInstances;
   const todayTotalTrains = useMemo(() => trains.filter((t) => t.runningDays?.[todayDay]).length, [trains, todayDay]);
-  const mapInstances = useMemo(() => runningNowInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent, currentStationName: inst.currentStation })), [todaysInstances]);
+  const mapInstances = useMemo(() => runningNowInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent, currentStationName: inst.currentStation, complaintCount: rmComplaintCounts[inst.key] || 0 })), [runningNowInstances, rmComplaintCounts]);
   const baseTrains = todayOnly ? trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0) : trains;
 
   const filteredTrains = useMemo(() => {
@@ -248,6 +253,57 @@ export default function TrainDashboard() {
   const ctsCount = valid.filter((s) => Boolean((s as StationRow & { cts?: boolean }).cts)).length;
   const mappedCount = valid.filter((s) => Number.isFinite(s.latitude) && Number.isFinite(s.longitude)).length;
   const routeDay = selectedInstance ? Math.max(1, Math.min(99, Math.floor((atMidnight(now).getTime() - atMidnight(departureDate!).getTime()) / 86400000) + 1)) : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMapComplaintCounts() {
+      if (!runningNowInstances.length) {
+        setRMComplaintCounts({});
+        return;
+      }
+      const entries = await Promise.all(runningNowInstances.map(async (inst) => {
+        try {
+          const params = new URLSearchParams({ train: inst.train.trainNo, depDate: dateKey(inst.departureDate) });
+          const res = await fetch(`/api/rm?${params.toString()}`, { cache: "no-store" });
+          const data = await res.json();
+          if (!res.ok || !data.ok) return [inst.key, 0] as const;
+          return [inst.key, Array.isArray(data.complaints) ? data.complaints.length : 0] as const;
+        } catch {
+          return [inst.key, 0] as const;
+        }
+      }));
+      if (!cancelled) setRMComplaintCounts(Object.fromEntries(entries));
+    }
+    void loadMapComplaintCounts();
+    return () => { cancelled = true; };
+  }, [runningNowInstances.map((x) => x.key).join("|")]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRM() {
+      if (!selectedInstance || !departureDate) {
+        setRMComplaints([]);
+        setRMError("");
+        setRMLoading(false);
+        return;
+      }
+      setRMLoading(true);
+      setRMError("");
+      try {
+        const params = new URLSearchParams({ train: selectedInstance.train.trainNo, depDate: dateKey(departureDate) });
+        const res = await fetch(`/api/rm?${params.toString()}`, { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || "Unable to load RailMadad data");
+        if (!cancelled) setRMComplaints(Array.isArray(data.complaints) ? data.complaints : []);
+      } catch (e: any) {
+        if (!cancelled) { setRMComplaints([]); setRMError(e?.message || "Unable to load RailMadad data"); }
+      } finally {
+        if (!cancelled) setRMLoading(false);
+      }
+    }
+    void loadRM();
+    return () => { cancelled = true; };
+  }, [selectedInstance?.key, selectedInstance?.train.trainNo, departureDate?.getTime()]);
 
   useEffect(() => {
     let cancelled = false;
@@ -463,7 +519,20 @@ export default function TrainDashboard() {
           </div>}
 
           {drawerTab === "contacts" && <div className="staff-state">Contacts section is ready for contact data.</div>}
-          {drawerTab === "rm" && <div className="staff-state">RM section is ready.</div>}
+          {drawerTab === "rm" && <div className="drawer-rm-content">
+            <div className="staff-date-note">RailMadad complaints for departure <b>{departureDate?.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" })}</b> • Train <b>{selectedInstance.train.trainNo}</b></div>
+            {rmLoading && <div className="staff-state">Loading RailMadad complaints…</div>}
+            {!rmLoading && rmError && <div className="staff-state staff-error">{rmError}</div>}
+            {!rmLoading && !rmError && !rmComplaints.length && <div className="staff-state">No RailMadad complaint record found for this train and departure date.</div>}
+            {!rmLoading && !rmError && rmComplaints.length > 0 && <div className="rm-table-wrap">
+              <table className="rm-table">
+                <thead><tr><th>REF NO.</th><th>DEP. DATE</th><th>COMP. HEAD</th><th>COMP. DATE &amp; TIME</th><th>TRAIN NO.</th><th>DISPOSAL TIME</th><th>COACH NO</th><th>PHYSICAL COACH NO.</th><th>COMPLAINT DESCRIPTION</th><th>ACTION TAKEN</th></tr></thead>
+                <tbody>{rmComplaints.map((item, index) => <tr key={`${item.refNo}-${item.compDateTime}-${index}`}>
+                  <td>{item.refNo || "—"}</td><td>{item.depDate || "—"}</td><td>{item.compHead || "—"}</td><td>{item.compDateTime || "—"}</td><td>{item.trainNo || "—"}</td><td>{item.disposalTime || "—"}</td><td>{item.coachNo || "—"}</td><td>{item.physicalCoachNo || "—"}</td><td className="rm-long-cell">{item.complaintDescription || "—"}</td><td className="rm-long-cell">{item.actionTaken || "—"}</td>
+                </tr>)}</tbody>
+              </table>
+            </div>}
+          </div>}
         </aside>}
       </div>
     </section>

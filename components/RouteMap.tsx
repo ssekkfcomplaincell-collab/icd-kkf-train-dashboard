@@ -13,6 +13,7 @@ export type MapTrainInstance = {
   departureDate: Date;
   percent: number;
   currentStationName: string;
+  complaintCount?: number;
 };
 
 function isExcludedStation(station: StationRow) {
@@ -202,7 +203,7 @@ export default function RouteMap({
           if (!markerPosition) return null;
           return <Marker
             position={markerPosition}
-            icon={labelIcon(route.instance.trainNo, route.color, isSelected)}
+            icon={labelIcon(route.instance.trainNo, route.color, isSelected, route.instance.complaintCount || 0)}
             eventHandlers={{ click: () => onTrainClick(route.instance.key) }}
             zIndexOffset={isSelected ? 1000 : 200}
           >

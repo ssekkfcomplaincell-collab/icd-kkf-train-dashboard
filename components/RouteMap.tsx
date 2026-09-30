@@ -26,9 +26,26 @@ function stationCoord(station: StationRow): [number, number] | null {
   if (Number.isFinite(station.latitude) && Number.isFinite(station.longitude)) {
     return [station.latitude as number, station.longitude as number];
   }
-  const code = String(station.stationCode || "").trim().toUpperCase();
+
   const list = fallbackStations as Array<any>;
-  const item = list.find((x) => String(x?.code || "").trim().toUpperCase() === code);
+  const rawCode = String(station.stationCode || "").trim().toUpperCase();
+  const codeAliases: Record<string, string[]> = {
+    MMCT: ["MMCT", "BCT"],
+    ADI: ["ADI", "ADIJ"],
+  };
+  const codes = codeAliases[rawCode] || [rawCode];
+  let item = list.find((x) => codes.includes(String(x?.code || "").trim().toUpperCase()));
+
+  // Some timetable rows use a code variant that is not present in the
+  // coordinate list. Fall back to the station name before giving up.
+  if (!item && station.stationName) {
+    const wantedName = station.stationName.trim().toUpperCase().replace(/\s+/g, " ");
+    item = list.find((x) => {
+      const name = String(x?.name || "").trim().toUpperCase().replace(/\s+/g, " ");
+      return name === wantedName || name.replace(/ JN\.?$/, "") === wantedName.replace(/ JN\.?$/, "");
+    });
+  }
+
   const lat = Number(item?.coordinates?.latitude);
   const lon = Number(item?.coordinates?.longitude);
   return Number.isFinite(lat) && Number.isFinite(lon) ? [lat, lon] : null;
@@ -155,7 +172,9 @@ export default function RouteMap({
   }), [instances]);
 
   const selectedRoute = routes.find((r) => r.instance.key === selectedKey);
-  const visibleRoutes = selectedKey ? routes.filter((r) => r.instance.key === selectedKey) : routes;
+  // Keep every currently-running train marker visible, even while one train is selected.
+  // Selection highlights/fits the chosen route but must not hide other running trains.
+  const visibleRoutes = routes;
   const runningPoints = visibleRoutes
     .map((r) => {
       const routeStations = r.instance.stations.filter((s) => !isExcludedStation(s));
@@ -198,7 +217,7 @@ export default function RouteMap({
           const markerPosition = markerPositionBase ? spreadPosition(markerPositionBase, sameStationRoutes.length, Math.max(0, sameIndex)) : null;
           const nextWatering = nextWateringStation(route.instance.stations, route.instance.currentStationName);
           const isSelected = route.instance.key === selectedKey;
-          const isVisible = !selectedKey || isSelected;
+          const isVisible = true;
           if (!isVisible) return null;
           if (!markerPosition) return null;
           return <Marker

@@ -23,17 +23,19 @@ function clean(value: unknown) {
   return String(value ?? "").replace(/\u00a0/g, " ").trim();
 }
 
+function trainNumbers(value: string) {
+  return Array.from(new Set(clean(value).toUpperCase().match(/\d{4,6}/g) || []));
+}
+
 function normalizeTrainNo(value: string) {
-  const s = clean(value).toUpperCase();
-  const m = s.match(/\d{4,6}/);
-  return m ? m[0] : s.replace(/\D/g, "");
+  return trainNumbers(value)[0] || clean(value).replace(/\D/g, "");
 }
 
 function trainCellMatches(cell: string, target: string) {
-  const wanted = normalizeTrainNo(target);
-  if (!wanted) return false;
-  const parts = clean(cell).toUpperCase().split(/[\s,;|]+/).flatMap((x) => x.split("/"));
-  return parts.some((part) => normalizeTrainNo(part) === wanted);
+  const wanted = trainNumbers(target);
+  const actual = trainNumbers(cell);
+  if (!wanted.length || !actual.length) return false;
+  return actual.some((number) => wanted.includes(number));
 }
 
 function normalizeDate(value: string) {
@@ -63,20 +65,32 @@ function weekdayForDate(date: string) {
   return names[new Date(`${iso}T00:00:00Z`).getUTCDay()];
 }
 
-function dateTabName(date: string) {
+function dateTabNames(date: string) {
   const normalized = normalizeDate(date);
   const weekday = weekdayForDate(normalized);
-  return weekday ? `${normalized} (${weekday})` : normalized;
+  // Published Google Sheets can expose date tabs either with or without the
+  // weekday suffix. Check both forms so a newly added today's sheet is not
+  // missed because its tab naming differs.
+  return Array.from(new Set([
+    weekday ? `${normalized} (${weekday})` : normalized,
+    normalized,
+  ].filter(Boolean)));
 }
 
-function dateKeysInclusive(startIso: string, end = new Date()) {
-  const start = new Date(`${startIso}T00:00:00`);
-  const last = new Date(end);
-  start.setHours(0, 0, 0, 0);
-  last.setHours(0, 0, 0, 0);
+function indiaTodayIso() {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function dateKeysInclusive(startIso: string, endIso = indiaTodayIso()) {
+  const start = new Date(`${startIso}T00:00:00Z`);
+  const last = new Date(`${endIso}T00:00:00Z`);
+  start.setUTCHours(0, 0, 0, 0);
+  last.setUTCHours(0, 0, 0, 0);
   const out: string[] = [];
-  for (const d = new Date(start); d <= last; d.setDate(d.getDate() + 1)) {
-    out.push(`${d.getDate().toString().padStart(2, "0")}.${(d.getMonth() + 1).toString().padStart(2, "0")}.${d.getFullYear().toString().slice(-2)}`);
+  for (const d = new Date(start); d <= last; d.setUTCDate(d.getUTCDate() + 1)) {
+    out.push(`${d.getUTCDate().toString().padStart(2, "0")}.${(d.getUTCMonth() + 1).toString().padStart(2, "0")}.${d.getUTCFullYear().toString().slice(-2)}`);
   }
   return out;
 }
@@ -102,7 +116,7 @@ function value(row: string[], index: number) {
 }
 
 async function fetchDateTab(sheetName: string, targetTrain: string, targetDepDate: string): Promise<RMComplaint[]> {
-  const url = `${RM_PUBLISHED_BASE_URL}?output=csv&sheet=${encodeURIComponent(sheetName)}`;
+  const url = `${RM_PUBLISHED_BASE_URL}?output=csv&sheet=${encodeURIComponent(sheetName)}&_ts=${Date.now()}`;
   const csv = await fetchText(url);
   if (!csv.trim()) return [];
 
@@ -160,9 +174,13 @@ export async function getRMComplaints(trainNo: string, departureDateIso: string)
   const sheetDates = dateKeysInclusive(startIso);
   const targetTrain = normalizeTrainNo(trainNo);
 
-  const settled = await Promise.allSettled(
-    sheetDates.map((date) => fetchDateTab(dateTabName(date), targetTrain, targetDepDate))
+  // Check every date sheet from the train's original departure date through
+  // today. For each date, check both possible published tab names. This is
+  // important for same-day complaints added to today's sheet.
+  const sheetJobs = sheetDates.flatMap((date) =>
+    dateTabNames(date).map((sheetName) => fetchDateTab(sheetName, targetTrain, targetDepDate))
   );
+  const settled = await Promise.allSettled(sheetJobs);
 
   const merged = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
   const seen = new Set<string>();

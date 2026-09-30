@@ -374,11 +374,46 @@ html[data-theme="dark"] .rm-table tbody tr:hover { background:#202832; }
 }
 
 /* Map: no train-number labels; only a complaint-count circle is shown when count > 0. */
-.train-map-complaint-wrap { background:transparent !important; border:0 !important; }
+.train-map-train-number-wrap {
+  background: transparent !important;
+  border: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: visible !important;
+}
+.train-map-train-number {
+  position: absolute;
+  left: 0;
+  top: -7px;
+  transform: translateX(7px);
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 800;
+  color: #111827;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 1px 2px #fff;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.train-map-train-number.selected {
+  font-size: 14px;
+}
+.train-map-complaint-wrap {
+  background: transparent !important;
+  border: 0 !important;
+}
 .train-map-complaint-only {
-  width:28px; height:28px; box-sizing:border-box; border-radius:50%;
-  background:#fff; border:3px solid var(--train-color); color:#111827;
-  display:flex; align-items:center; justify-content:center;
-  font-size:12px; font-weight:900; line-height:1;
-  box-shadow:0 2px 7px rgba(0,0,0,.25);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #111827;
+  background: #fff;
+  border: 2px solid var(--train-color);
+  box-sizing: border-box;
+  box-shadow: 0 1px 4px rgba(0,0,0,.22);
 }

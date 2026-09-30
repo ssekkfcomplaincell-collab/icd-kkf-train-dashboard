@@ -78,6 +78,15 @@ function trainColor(index: number) {
   return colors[index % colors.length];
 }
 
+function trainNumberIcon(trainNo: string, color: string, selected: boolean) {
+  return new DivIcon({
+    className: "train-map-train-number-wrap",
+    html: `<div class="train-map-train-number${selected ? " selected" : ""}" style="--train-color:${color}">${trainNo}</div>`,
+    iconSize: [1, 1],
+    iconAnchor: [0, 8],
+  });
+}
+
 function complaintIcon(count: number, color: string) {
   return new DivIcon({
     className: "train-map-complaint-wrap",
@@ -198,9 +207,15 @@ export default function RouteMap({
           return <Fragment>
             <CircleMarker
               center={markerPosition}
-              radius={isSelected ? 9 : 7}
+              radius={isSelected ? 8 : 6}
               pathOptions={{ color: route.color, weight: 2, fillOpacity: 0.95 }}
               eventHandlers={{ click: () => onTrainClick(route.instance.key) }}
+            />
+            <Marker
+              position={markerPosition}
+              icon={trainNumberIcon(route.instance.trainNo, route.color, isSelected)}
+              eventHandlers={{ click: () => onTrainClick(route.instance.key) }}
+              zIndexOffset={isSelected ? 1000 : 700}
             />
             {route.instance.complaintCount && route.instance.complaintCount > 0 ? (
               <Marker

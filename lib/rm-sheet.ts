@@ -122,7 +122,12 @@ async function fetchDateTab(sheetName: string, targetTrain: string, targetDepDat
     if (explicitTrain) currentTrain = explicitTrain;
 
     if (normalizeDate(currentDepDate) !== normalizeDate(targetDepDate)) continue;
-    if (!trainCellMatches(currentTrain, targetTrain)) continue;
+
+    // IMPORTANT: Do not inherit a train number from a previous row.
+    // A RailMadad row is associated with a train only when Column H
+    // explicitly contains that train number. Blank H cells must not be
+    // counted/displayed for any train.
+    if (!explicitTrain || !trainCellMatches(explicitTrain, targetTrain)) continue;
 
     // B,D,F,G,H,J,K,L,M,N => indexes 1,3,5,6,7,9,10,11,12,13
     const item: RMComplaint = {

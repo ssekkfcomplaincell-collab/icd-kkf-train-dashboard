@@ -18,6 +18,7 @@ const RM_PUBLISHED_BASE_URL =
 
 const CACHE_TTL_MS = 15_000;
 const cache = new Map<string, { savedAt: number; data: RMComplaint[] }>();
+const publishedGidCache = new Map<string, string>();
 
 function clean(value: unknown) {
   return String(value ?? "").replace(/\u00a0/g, " ").trim();
@@ -115,9 +116,58 @@ function value(row: string[], index: number) {
   return clean(row[index]);
 }
 
+async function fetchCsvByGid(gid: string) {
+  const url = `${RM_PUBLISHED_BASE_URL}?gid=${encodeURIComponent(gid)}&single=true&output=csv&_ts=${Date.now()}`;
+  return fetchText(url);
+}
+
+async function discoverPublishedGid(sheetName: string) {
+  const normalizedName = clean(sheetName).toLowerCase();
+  const cached = publishedGidCache.get(normalizedName);
+  if (cached !== undefined) return cached;
+
+  const htmlUrl = `${RM_PUBLISHED_BASE_URL}html?_ts=${Date.now()}`;
+  const html = await fetchText(htmlUrl);
+  const escaped = sheetName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // Google has changed the published HTML markup over time. Look for the
+  // requested tab name near a numeric gid in either direction.
+  const patterns = [
+    new RegExp("gid(?:=|%3D)(\\d{1,20})[\\s\\S]{0,1500}" + escaped, "i"),
+    new RegExp(escaped + "[\\s\\S]{0,1500}gid(?:=|%3D)(\\d{1,20})", "i"),
+    new RegExp("gid=(\\d{1,20})[^>]{0,500}>[^<]*" + escaped, "i"),
+    new RegExp(escaped + "[^<]{0,500}<[^>]*gid=(\\d{1,20})", "i"),
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) {
+      publishedGidCache.set(normalizedName, match[1]);
+      return match[1];
+    }
+  }
+
+  publishedGidCache.set(normalizedName, "");
+  return "";
+}
+
 async function fetchDateTab(sheetName: string, targetTrain: string, targetDepDate: string): Promise<RMComplaint[]> {
-  const url = `${RM_PUBLISHED_BASE_URL}?output=csv&sheet=${encodeURIComponent(sheetName)}&_ts=${Date.now()}`;
-  const csv = await fetchText(url);
+  let csv = "";
+
+  // The reliable published CSV form for a specific Google Sheets tab uses
+  // its numeric gid. Discover that gid from the published workbook first.
+  // Keep the sheet-name form as a fallback because older published sheets
+  // may still accept it.
+  try {
+    const gid = await discoverPublishedGid(sheetName);
+    if (gid) csv = await fetchCsvByGid(gid);
+  } catch {
+    // Try the legacy sheet-name endpoint below.
+  }
+
+  if (!csv.trim()) {
+    const url = `${RM_PUBLISHED_BASE_URL}?output=csv&sheet=${encodeURIComponent(sheetName)}&single=true&_ts=${Date.now()}`;
+    csv = await fetchText(url);
+  }
   if (!csv.trim()) return [];
 
   const parsed = Papa.parse<string[]>(csv, { header: false, skipEmptyLines: true });
@@ -127,20 +177,11 @@ async function fetchDateTab(sheetName: string, targetTrain: string, targetDepDat
   for (const row of parsed.data) {
     if (!row?.length) continue;
 
-    const explicitDepDate = normalizeDate(row[3]); // Column D (DEPT. DATE)
-    const explicitTrain = clean(row[7]); // Column H
-    // RailMadad matching structure: D = DEPT. DATE, H = TRAIN NO.
-    // Match only rows where both values are explicitly present on that row.
-    // Do not inherit either value from surrounding rows.
+    const explicitDepDate = normalizeDate(row[3]); // Column D = DEP. DATE
+    const explicitTrain = clean(row[7]); // Column H = TRAIN NO.
     if (!explicitDepDate || normalizeDate(explicitDepDate) !== normalizeDate(targetDepDate)) continue;
-
-    // IMPORTANT: Do not inherit a train number from a previous row.
-    // A RailMadad row is associated with a train only when Column H
-    // explicitly contains that train number. Blank H cells must not be
-    // counted/displayed for any train.
     if (!explicitTrain || !trainCellMatches(explicitTrain, targetTrain)) continue;
 
-    // B,D,F,G,H,J,K,L,M,N => indexes 1,3,5,6,7,9,10,11,12,13
     const item: RMComplaint = {
       refNo: value(row, 1),
       depDate: value(row, 3),

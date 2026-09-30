@@ -238,10 +238,10 @@ export default function TrainDashboard() {
   const rmComplaintCountsByTrainNo = useMemo(() => {
     const totals: Record<string, number> = {};
     for (const inst of todaysTrainInstances) {
-      const count = rmComplaintCounts[inst.key] || 0;
-      if (count <= 0) continue;
       const key = inst.train.trainNo.trim().toUpperCase();
-      totals[key] = (totals[key] || 0) + count;
+      const count = rmComplaintCounts[`__TOTAL__${key}`] || 0;
+      if (count <= 0) continue;
+      totals[key] = count;
     }
     return totals;
   }, [todaysTrainInstances, rmComplaintCounts]);
@@ -312,13 +312,54 @@ export default function TrainDashboard() {
           const params = new URLSearchParams({ train: inst.train.trainNo, depDate: dateKey(inst.departureDate) });
           const res = await fetch(`/api/rm?${params.toString()}&ts=${Date.now()}`, { cache: "no-store" });
           const data = await res.json();
-          if (!res.ok || !data.ok) return [inst.key, 0] as const;
-          return [inst.key, Array.isArray(data.complaints) ? data.complaints.length : 0] as const;
+          if (!res.ok || !data.ok) return { key: inst.key, trainNo: inst.train.trainNo, complaints: [] as RMComplaint[] };
+          return {
+            key: inst.key,
+            trainNo: inst.train.trainNo,
+            complaints: Array.isArray(data.complaints) ? data.complaints as RMComplaint[] : [],
+          };
         } catch {
-          return [inst.key, 0] as const;
+          return { key: inst.key, trainNo: inst.train.trainNo, complaints: [] as RMComplaint[] };
         }
       }));
-      if (!cancelled) setRMComplaintCounts(Object.fromEntries(entries));
+
+      // Aggregate by train number using UNIQUE complaint records, rather than
+      // adding the raw count returned for every service instance. A train can
+      // have several active/overnight instances, and the same RM record may
+      // therefore be encountered more than once. This keeps 19166 at its real
+      // count (1) while still allowing 19422 to show 29.09 + 30.09 = 5.
+      const totals: Record<string, number> = {};
+      const seenByTrain = new Map<string, Set<string>>();
+      for (const entry of entries) {
+        const trainKey = entry.trainNo.trim().toUpperCase();
+        if (!seenByTrain.has(trainKey)) seenByTrain.set(trainKey, new Set());
+        const seen = seenByTrain.get(trainKey)!;
+        for (const item of entry.complaints) {
+          const complaintKey = [
+            item.refNo,
+            item.compDateTime,
+            item.trainNo,
+            item.coachNo,
+            item.physicalCoachNo,
+            item.complaintDescription,
+          ].join("|").toLowerCase();
+          if (!complaintKey.replace(/\|/g, "")) continue;
+          if (seen.has(complaintKey)) continue;
+          seen.add(complaintKey);
+        }
+      }
+      for (const [trainKey, seen] of seenByTrain) totals[trainKey] = seen.size;
+
+      // Keep the state keyed by each instance for compatibility with the
+      // selected RM drawer, but use the de-duplicated train totals for map/UI.
+      const instanceCounts = Object.fromEntries(
+        entries.map((entry) => [entry.key, entry.complaints.length])
+      );
+      if (!cancelled) {
+        setRMComplaintCounts({ ...instanceCounts, ...Object.fromEntries(
+          Object.entries(totals).map(([trainKey, count]) => [`__TOTAL__${trainKey}`, count])
+        ) });
+      }
     }
     void loadMapComplaintCounts();
     const refreshId = window.setInterval(() => { void loadMapComplaintCounts(); }, 30_000);

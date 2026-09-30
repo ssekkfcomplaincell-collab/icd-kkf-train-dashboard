@@ -114,7 +114,7 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .train-hover-tooltip-content span { white-space:nowrap; }
 .taptrack-legend { left:50%; transform:translateX(-50%); bottom:12px; }
 @media (max-width:900px) { .taptrack-map-stage { height:620px; } .map-left-drawer { width:250px; } .map-right-drawer { width:330px; } }
-@media (max-width:700px) { .taptrack-map-stage { height:720px; } .map-left-drawer { top:10px; left:10px; right:10px; width:auto; max-height:250px; } .map-train-list { display:grid; grid-template-columns:1fr 1fr; } .map-right-drawer { top:270px; left:10px; right:10px; bottom:10px; width:auto; max-width:none; } .taptrack-legend { display:none; } }
+@media (max-width:700px) { .taptrack-map-stage { height:720px; } .map-left-drawer { top:10px; left:10px; right:10px; width:auto; max-height:250px; } .map-train-list { display:block; } .map-right-drawer { top:270px; left:10px; right:10px; bottom:10px; width:auto; max-width:none; } .taptrack-legend { display:none; } }
 
 
 /* Watering point alerts: shown on the map when a train is within 20 minutes of watering */
@@ -242,7 +242,13 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
   .today-train-collapsed small { font-size:7px; }
   .running-chevron { font-size:14px; }
   .today-train-chevron { font-size:14px; }
-  .today-train-item { padding:8px; }
+  .today-train-item { padding:9px; }
+  .map-train-card { padding:9px; margin:0 0 7px; border-radius:9px; }
+  .map-train-card:last-child { margin-bottom:0; }
+  .map-train-head b { font-size:13px; }
+  .map-train-route { margin-top:7px; font-size:9px; }
+  .map-train-meta { margin-top:5px; font-size:8px; }
+  .map-train-progress { margin-top:7px; }
 }
 
 /* Theme toggle + full-screen light/dark mode */

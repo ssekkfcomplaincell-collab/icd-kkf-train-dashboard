@@ -221,7 +221,23 @@ export default function TrainDashboard() {
   const todaysTrainInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW" || i.status === "DEPARTS TODAY" || i.status === "COMPLETED"), [allInstances]);
   const todaysInstances = runningNowInstances;
   const todayTotalTrains = useMemo(() => trains.filter((t) => t.runningDays?.[todayDay]).length, [trains, todayDay]);
-  const mapInstances = useMemo(() => runningNowInstances.map((inst) => ({ key: inst.key, trainNo: inst.train.trainNo, stations: validStations(inst.train.stations), departureDate: inst.departureDate, percent: inst.percent, currentStationName: inst.currentStation, complaintCount: rmComplaintCounts[inst.key] || 0 })), [runningNowInstances, rmComplaintCounts]);
+  // On first load show ONLY trains that are running right now.
+  // When the user selects a DEPT. TODAY / JOURNEY COMPLETED train, temporarily
+  // add that selected service to the map so its route and details can be opened.
+  const mapInstances = useMemo(() => {
+    const source = selectedKey
+      ? [...runningNowInstances, ...todaysTrainInstances.filter((inst) => inst.key === selectedKey && !runningNowInstances.some((r) => r.key === inst.key))]
+      : runningNowInstances;
+    return source.map((inst) => ({
+      key: inst.key,
+      trainNo: inst.train.trainNo,
+      stations: validStations(inst.train.stations),
+      departureDate: inst.departureDate,
+      percent: inst.percent,
+      currentStationName: inst.currentStation,
+      complaintCount: rmComplaintCounts[inst.key] || 0,
+    }));
+  }, [runningNowInstances, todaysTrainInstances, selectedKey, rmComplaintCounts]);
   const baseTrains = todayOnly ? trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0) : trains;
 
   const filteredTrains = useMemo(() => {
@@ -235,10 +251,11 @@ export default function TrainDashboard() {
   }, [baseTrains, search]);
 
   useEffect(() => {
-    if (selectedKey && !runningNowInstances.some((x) => x.key === selectedKey)) setSelectedKey("");
-  }, [selectedKey, runningNowInstances]);
+    if (selectedKey && !todaysTrainInstances.some((x) => x.key === selectedKey)) setSelectedKey("");
+  }, [selectedKey, todaysTrainInstances]);
 
-  const selectedInstance = runningNowInstances.find((x) => x.key === selectedKey) || null;
+  // A selected train may be RUNNING, DEPT. TODAY, or JOURNEY COMPLETED.
+  const selectedInstance = todaysTrainInstances.find((x) => x.key === selectedKey) || null;
   const selected = selectedInstance?.train || filteredTrains[0] || trains[0] || null;
   const departureDate = selectedInstance?.departureDate || null;
   const stations = selected?.stations || [];
@@ -397,7 +414,7 @@ export default function TrainDashboard() {
           })}
         </div>}
 
-        {runningNowInstances.length ? <RouteMap instances={mapInstances} selectedKey={selectedInstance?.key || ""} onTrainClick={(key) => setSelectedKey(key)} /> : <div className="real-map map-loading">No train is running at the current scheduled time.</div>}
+        {mapInstances.length ? <RouteMap instances={mapInstances} selectedKey={selectedInstance?.key || ""} onTrainClick={(key) => setSelectedKey(key)} /> : <div className="real-map map-loading">No train is running at the current scheduled time.</div>}
 
         <aside className={`map-left-drawer ${showRunningList ? "open" : "collapsed"}`}>
           {!showRunningList ? (
@@ -462,7 +479,7 @@ export default function TrainDashboard() {
                   const last = routeStations[routeStations.length - 1];
                   const statusClass = inst.status === "RUNNING NOW" ? "running" : inst.status === "COMPLETED" ? "completed" : "depart";
                   const statusText = inst.status === "RUNNING NOW" ? "RUNNING" : inst.status === "COMPLETED" ? "JOURNEY COMPLETED" : "DEPT. TODAY";
-                  return <button key={inst.key} className="today-train-item" onClick={() => inst.status === "RUNNING NOW" && setSelectedKey(inst.key)} disabled={inst.status !== "RUNNING NOW"}>
+                  return <button key={inst.key} className="today-train-item" onClick={() => setSelectedKey(inst.key)}>
                     <div className="today-train-item-top"><b>{inst.train.trainNo}</b><span className={`today-status ${statusClass}`}>{statusText}</span></div>
                     <div className="today-train-route">{first?.stationCode || "—"} → {last?.stationCode || "—"}</div>
                     <div className="today-train-dep">Dep {inst.departureDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div>

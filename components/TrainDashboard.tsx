@@ -63,8 +63,19 @@ function wateringCodeForEvent(key: string) {
 function serviceInstance(train: Train, departureDate: Date, now: Date): ServiceInstance | null {
   const stations = validStations(train.stations);
   if (stations.length < 2) return null;
-  const start = rowDateTime(stations[0], departureDate, "departure") || rowDateTime(stations[0], departureDate, "arrival");
-  const endStation = [...stations].reverse().find((s) => rowDateTime(s, departureDate, "arrival") || rowDateTime(s, departureDate, "departure"));
+
+  // Timing must not be shortened just because a row is hidden from the route
+  // display (for example a "Via Station" row). Keep deleted rows excluded,
+  // but allow non-deleted timing rows to determine the true service end.
+  // Otherwise an active train can disappear from the map before its actual
+  // scheduled end time.
+  const timingStations = train.stations.filter((s) => {
+    const text = `${s.stationCode} ${s.stationName} ${s.trainNo} ${s.section} ${s.watering} ${s.arrival} ${s.departure}`.toLowerCase();
+    return !text.includes("deleted");
+  });
+  const startStation = timingStations.find((s) => rowDateTime(s, departureDate, "departure") || rowDateTime(s, departureDate, "arrival")) || stations[0];
+  const endStation = [...timingStations].reverse().find((s) => rowDateTime(s, departureDate, "arrival") || rowDateTime(s, departureDate, "departure"));
+  const start = rowDateTime(startStation, departureDate, "departure") || rowDateTime(startStation, departureDate, "arrival");
   const end = endStation ? (rowDateTime(endStation, departureDate, "arrival") || rowDateTime(endStation, departureDate, "departure")) : null;
   if (!start || !end) return null;
 
@@ -77,7 +88,7 @@ function serviceInstance(train: Train, departureDate: Date, now: Date): ServiceI
     // This is important for overnight trains that departed yesterday but
     // completed their journey today.
     if (dateKey(end) === dateKey(now)) {
-      return { key: `${train.trainNo}-${dateKey(departureDate)}`, train, departureDate, status: "COMPLETED", currentStation: endStation?.stationName || stations[stations.length - 1].stationName, nextStation: "Journey completed", percent: 100 };
+      return { key: `${train.trainNo}-${dateKey(departureDate)}`, train, departureDate, status: "COMPLETED", currentStation: stations[stations.length - 1].stationName, nextStation: "Journey completed", percent: 100 };
     }
     return null;
   }
@@ -274,7 +285,11 @@ export default function TrainDashboard() {
   useEffect(() => {
     let cancelled = false;
     async function loadMapComplaintCounts() {
-      const source = showTodayTrainList ? todaysTrainInstances : runningNowInstances;
+      // Always load counts for the complete TODAY'S TRAIN set, even when the
+      // drawer is collapsed. This keeps the RMCs count ready for completed,
+      // running and today's-departure trains without waiting for the drawer
+      // to be opened.
+      const source = todaysTrainInstances;
       if (!source.length) {
         setRMComplaintCounts({});
         return;
@@ -295,7 +310,7 @@ export default function TrainDashboard() {
     void loadMapComplaintCounts();
     const refreshId = window.setInterval(() => { void loadMapComplaintCounts(); }, 30_000);
     return () => { cancelled = true; window.clearInterval(refreshId); };
-  }, [showTodayTrainList, runningNowInstances.map((x) => x.key).join("|"), todaysTrainInstances.map((x) => x.key).join("|")]);
+  }, [todaysTrainInstances.map((x) => x.key).join("|")]);
 
   useEffect(() => {
     let cancelled = false;

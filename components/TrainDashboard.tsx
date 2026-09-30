@@ -235,6 +235,17 @@ export default function TrainDashboard() {
   // On first load show ONLY trains that are running right now.
   // When the user selects a DEPT. TODAY / JOURNEY COMPLETED train, temporarily
   // add that selected service to the map so its route and details can be opened.
+  const rmComplaintCountsByTrainNo = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const inst of todaysTrainInstances) {
+      const count = rmComplaintCounts[inst.key] || 0;
+      if (count <= 0) continue;
+      const key = inst.train.trainNo.trim().toUpperCase();
+      totals[key] = (totals[key] || 0) + count;
+    }
+    return totals;
+  }, [todaysTrainInstances, rmComplaintCounts]);
+
   const mapInstances = useMemo(() => {
     const source = selectedKey
       ? [...runningNowInstances, ...todaysTrainInstances.filter((inst) => inst.key === selectedKey && !runningNowInstances.some((r) => r.key === inst.key))]
@@ -246,9 +257,11 @@ export default function TrainDashboard() {
       departureDate: inst.departureDate,
       percent: inst.percent,
       currentStationName: inst.currentStation,
-      complaintCount: rmComplaintCounts[inst.key] || 0,
+      // Show the total RailMadad complaints for this train number across all
+      // active Today's Train instances (e.g. 29.09 + 30.09 for 19422).
+      complaintCount: rmComplaintCountsByTrainNo[inst.train.trainNo.trim().toUpperCase()] || 0,
     }));
-  }, [runningNowInstances, todaysTrainInstances, selectedKey, rmComplaintCounts]);
+  }, [runningNowInstances, todaysTrainInstances, selectedKey, rmComplaintCountsByTrainNo]);
   const baseTrains = todayOnly ? trains.filter((t) => t.runningDays?.[todayDay] || activeInstances(t, now).length > 0) : trains;
 
   const filteredTrains = useMemo(() => {
@@ -462,7 +475,7 @@ export default function TrainDashboard() {
                       <div className="map-train-head">
                         <span className="map-train-dot" style={{ background: ["#1769aa", "#8b1fc8", "#0f8a67", "#e07a00", "#3155d8", "#c43d76", "#1487a8", "#7356c8"][colorIndex % 8] }} />
                         <b>{inst.train.trainNo}</b>
-                        {(rmComplaintCounts[inst.key] || 0) > 0 && <span className="running-rm-count">RMCs - {rmComplaintCounts[inst.key]}</span>}
+                        {(rmComplaintCountsByTrainNo[inst.train.trainNo.trim().toUpperCase()] || 0) > 0 && <span className="running-rm-count">RMCs - {rmComplaintCountsByTrainNo[inst.train.trainNo.trim().toUpperCase()]}</span>}
                         <small>Dep {inst.departureDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</small>
                       </div>
                       <div className="map-train-route">{first?.stationCode || "—"} <span>→</span> {last?.stationCode || "—"}</div>
@@ -498,7 +511,7 @@ export default function TrainDashboard() {
                   const statusClass = inst.status === "RUNNING NOW" ? "running" : inst.status === "COMPLETED" ? "completed" : "depart";
                   const statusText = inst.status === "RUNNING NOW" ? "RUNNING" : inst.status === "COMPLETED" ? "JOURNEY COMPLETED" : "DEPT. TODAY";
                   return <button key={inst.key} className="today-train-item" onClick={() => setSelectedKey(inst.key)}>
-                    <div className="today-train-item-top"><span className="today-train-number"><b>{inst.train.trainNo}</b>{(rmComplaintCounts[inst.key] || 0) > 0 && <span className="today-rm-count">RMCs - {rmComplaintCounts[inst.key]}</span>}</span><span className={`today-status ${statusClass}`}>{statusText}</span></div>
+                    <div className="today-train-item-top"><span className="today-train-number"><b>{inst.train.trainNo}</b>{(rmComplaintCountsByTrainNo[inst.train.trainNo.trim().toUpperCase()] || 0) > 0 && <span className="today-rm-count">RMCs - {rmComplaintCountsByTrainNo[inst.train.trainNo.trim().toUpperCase()]}</span>}</span><span className={`today-status ${statusClass}`}>{statusText}</span></div>
                     <div className="today-train-route">{first?.stationCode || "—"} → {last?.stationCode || "—"}</div>
                     <div className="today-train-dep">Dep {inst.departureDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</div>
                   </button>;

@@ -124,18 +124,15 @@ async function fetchDateTab(sheetName: string, targetTrain: string, targetDepDat
   if (parsed.errors.length) throw new Error(parsed.errors[0]?.message || "Invalid RailMadad CSV");
 
   const results: RMComplaint[] = [];
-  let currentDepDate = "";
-  let currentTrain = "";
-
   for (const row of parsed.data) {
     if (!row?.length) continue;
 
-    const explicitDepDate = normalizeDate(row[3]); // Column D
+    const explicitDepDate = normalizeDate(row[3]); // Column D (DEPT. DATE)
     const explicitTrain = clean(row[7]); // Column H
-    if (explicitDepDate) currentDepDate = explicitDepDate;
-    if (explicitTrain) currentTrain = explicitTrain;
-
-    if (normalizeDate(currentDepDate) !== normalizeDate(targetDepDate)) continue;
+    // RailMadad matching structure: D = DEPT. DATE, H = TRAIN NO.
+    // Match only rows where both values are explicitly present on that row.
+    // Do not inherit either value from surrounding rows.
+    if (!explicitDepDate || normalizeDate(explicitDepDate) !== normalizeDate(targetDepDate)) continue;
 
     // IMPORTANT: Do not inherit a train number from a previous row.
     // A RailMadad row is associated with a train only when Column H

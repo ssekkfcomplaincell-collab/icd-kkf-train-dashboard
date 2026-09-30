@@ -156,6 +156,7 @@ export default function TrainDashboard() {
   const [rmLoading, setRMLoading] = useState(false);
   const [rmError, setRMError] = useState("");
   const [rmComplaintCounts, setRMComplaintCounts] = useState<Record<string, number>>({});
+  const [rmComplaintDataByInstance, setRMComplaintDataByInstance] = useState<Record<string, RMComplaint[]>>({});
 
   async function load(options: { silent?: boolean; force?: boolean } = {}) {
     const { silent = false, force = false } = options;
@@ -239,8 +240,10 @@ export default function TrainDashboard() {
   // original departure date), not just the train number. This is important
   // for overnight/repeated services such as 19166: the 28.09 service can
   // have 6 complaints while the 30.09 service has 1.
-  const rmComplaintCountForInstance = (inst: typeof todaysTrainInstances[number]) =>
-    rmComplaintCounts[inst.key] || 0;
+  const rmComplaintCountForInstance = (inst: typeof todaysTrainInstances[number]) => {
+    const exact = rmComplaintDataByInstance[inst.key];
+    return exact ? exact.length : (rmComplaintCounts[inst.key] || 0);
+  };
 
   const mapInstances = useMemo(() => {
     const source = selectedKey
@@ -329,8 +332,14 @@ export default function TrainDashboard() {
       const instanceCounts = Object.fromEntries(
         entries.map((entry) => [entry.key, entry.complaints.length])
       );
+      const instanceData = Object.fromEntries(
+        entries.map((entry) => [entry.key, entry.complaints])
+      );
 
-      if (!cancelled) setRMComplaintCounts(instanceCounts);
+      if (!cancelled) {
+        setRMComplaintCounts(instanceCounts);
+        setRMComplaintDataByInstance(instanceData);
+      }
     }
     void loadMapComplaintCounts();
     const refreshId = window.setInterval(() => { void loadMapComplaintCounts(); }, 30_000);
@@ -353,7 +362,12 @@ export default function TrainDashboard() {
         const res = await fetch(`/api/rm?${params.toString()}`, { cache: "no-store" });
         const data = await res.json();
         if (!res.ok || !data.ok) throw new Error(data.error || "Unable to load RailMadad data");
-        if (!cancelled) setRMComplaints(Array.isArray(data.complaints) ? data.complaints : []);
+        if (!cancelled) {
+          const complaints = Array.isArray(data.complaints) ? data.complaints as RMComplaint[] : [];
+          setRMComplaints(complaints);
+          setRMComplaintCounts((prev) => ({ ...prev, [selectedInstance.key]: complaints.length }));
+          setRMComplaintDataByInstance((prev) => ({ ...prev, [selectedInstance.key]: complaints }));
+        }
       } catch (e: any) {
         if (!cancelled) { setRMComplaints([]); setRMError(e?.message || "Unable to load RailMadad data"); }
       } finally {

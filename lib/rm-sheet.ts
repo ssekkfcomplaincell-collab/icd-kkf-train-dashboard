@@ -243,10 +243,15 @@ export async function getRMComplaints(trainNo: string, departureDateIso: string)
   const settled = await Promise.allSettled(sheetJobs);
 
   const merged = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
+  // Count each RailMadad complaint once. REF NO. is the complaint's unique
+  // identifier; this also prevents the same row being counted twice when the
+  // same date tab is reached through gviz and the published fallback.
   const seen = new Set<string>();
   const data = merged.filter((item) => {
-    const key = [item.refNo, item.compDateTime, item.trainNo, item.coachNo, item.complaintDescription].join("|").toLowerCase();
-    if (!key.replace(/\|/g, "")) return false;
+    const ref = clean(item.refNo);
+    const fallbackKey = [item.compDateTime, item.trainNo, item.coachNo, item.complaintDescription].join("|").toLowerCase();
+    const key = ref ? `ref:${ref.toLowerCase()}` : `row:${fallbackKey}`;
+    if (!key.replace(/[:|]/g, "")) return false;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

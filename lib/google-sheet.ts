@@ -1,7 +1,7 @@
 import Papa from "papaparse";
 import { StationRow, Train, Weekday } from "./types";
 
-const SCHEDULE_SPREADSHEET_ID = "1HBFYHFkf7P5yZ2dC76FkZF5Pfe-QVtilDDFW6nTdE";
+const SCHEDULE_SPREADSHEET_ID = "1HBFYHFkf7Pq5YdZ2zC76FkZF5Pfe-QVtilDDFW6nTdE";
 const SCHEDULE_GID = "1463153132";
 const DEFAULT_SCHEDULE_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQXHb-McVF62fJFt1CDecykHzBwhmXnG9NrUTOyn1-iZIg2NFBZ6YySnxgwihcdvFLvMPXDk3WZ0g7z/pub?gid=1463153132&single=true&output=csv";

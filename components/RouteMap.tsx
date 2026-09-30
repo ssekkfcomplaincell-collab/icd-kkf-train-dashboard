@@ -77,12 +77,12 @@ function trainColor(index: number) {
   return colors[index % colors.length];
 }
 
-function labelIcon(trainNo: string, color: string, selected: boolean) {
+function labelIcon(trainNo: string, color: string, selected: boolean, complaintCount = 0) {
   return new DivIcon({
     className: "train-map-label-wrap",
-    html: `<div class="train-map-label ${selected ? "selected" : ""}" style="--train-color:${color}"><span class="train-map-pulse"></span><b>${trainNo}</b></div>`,
-    iconSize: [82, 30],
-    iconAnchor: [41, 15],
+    html: `<div class="train-map-label ${selected ? "selected" : ""}" style="--train-color:${color}"><span class="train-map-pulse"></span><span class="train-map-complaint-count">${complaintCount}</span><b>${trainNo}</b></div>`,
+    iconSize: [82, 42],
+    iconAnchor: [41, 21],
   });
 }
 

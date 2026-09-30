@@ -178,7 +178,7 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
   top:14px;
   right:14px;
   left:auto;
-  width:190px;
+  width:285px;
   max-height:650px;
   display:flex;
   flex-direction:column;
@@ -222,7 +222,8 @@ h1 { margin:5px 0 3px; font-size:30px; letter-spacing:-.03em; } h2 { margin:4px 
 .today-train-item-top { display:flex; justify-content:space-between; align-items:center; gap:6px; }
 .today-train-item-top b { font-size:13px; }
 .today-train-number { display:flex; align-items:center; gap:7px; min-width:0; }
-.today-rm-count { color:#b42318; font-size:8px; font-weight:900; white-space:nowrap; }
+.today-rm-count, .running-rm-count { color:#b42318; font-size:7px; font-weight:900; white-space:nowrap; }
+.running-rm-count { margin-left:1px; }
 .today-status { font-size:7px; font-weight:900; letter-spacing:.03em; padding:3px 5px; border-radius:5px; white-space:nowrap; }
 .today-status.running { background:#e8f7f0; color:#16855b; }
 .today-status.completed { background:#eef2f6; color:#64748b; }

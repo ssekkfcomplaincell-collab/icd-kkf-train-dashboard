@@ -156,15 +156,21 @@ async function fetchStaffForDateTab(sheetName: string, trainNo: string, departur
 
     // Google Sheets uses merged cells. Only the first physical row contains
     // TRAIN/JCO, so carry those values down until a new block starts.
-    if (explicitTrain) currentTrain = rawTrain;
-    if (explicitJco) currentJco = explicitJco;
+    if (explicitTrain) {
+      currentTrain = rawTrain;
+      // TRAIN is a merged block header. A new train block must start with a
+      // fresh JCO value; never inherit the previous train's JCO.
+      currentJco = explicitJco;
+    } else if (explicitJco) {
+      currentJco = explicitJco;
+    }
 
     if (!trainMatches(currentTrain, trainNo)) continue;
 
-    // The date tab itself is already the service-date search key. If JCO is
-    // present, prefer the original departure-date match. If JCO is blank on
-    // a continuation row, keep using the block's inherited JCO.
-    if (currentJco && currentJco !== targetDate) continue;
+    // Staff belongs to the exact service block whose JCO equals the
+    // train's ORIGINAL departure date. Do not accept a blank JCO block and
+    // do not let another train/date block leak staff into this train.
+    if (currentJco !== targetDate) continue;
 
     // OBHS: F=ID/No, G=Name, H=Contact No.
     const obhsId = nonEmpty(row[5]);
@@ -223,11 +229,17 @@ async function findStaffFromDepartureToToday(trainNo: string, departureDate: str
 
   if (!matches.length) return null;
 
+  // IMPORTANT: one running train instance must use ONE service's staff.
+  // Prefer the original departure-date tab; only fall back to a later tab if
+  // the original-date tab has no matching staff block. Never merge staff from
+  // multiple dates, otherwise ACCA/OBHS from another day's service can appear
+  // on the selected train.
+  const preferred = matches.find((item) => item.departureDate === start) || matches[0];
   return {
     trainNo: normalizeTrainNo(trainNo),
     departureDate: start,
-    obhs: uniqueMembers(matches.flatMap((item) => item.obhs)),
-    acca: uniqueMembers(matches.flatMap((item) => item.acca)),
+    obhs: uniqueMembers(preferred.obhs),
+    acca: uniqueMembers(preferred.acca),
   };
 }
 

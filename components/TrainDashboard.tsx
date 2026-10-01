@@ -21,9 +21,20 @@ type ServiceInstance = {
   percent: number;
 };
 
-function todayInfo() {
-  const now = new Date();
-  return { date: now.toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }), day: WEEKDAYS[(now.getDay() + 6) % 7] };
+function todayInfo(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    weekday: "long",
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
+  const weekday = get("weekday") as Weekday;
+  return {
+    date: `${get("day")} ${get("month")} ${get("year")}`,
+    day: WEEKDAYS.includes(weekday) ? weekday : WEEKDAYS[(now.getDay() + 6) % 7],
+  };
 }
 function wateringClass(value: string) { const v = value.toUpperCase(); if (v.includes("S/W")) return "sw"; if (v.includes("O/D")) return "od"; return ""; }
 function firstTime(stations: StationRow[], field: "arrival" | "departure") { return stations.find((s) => /^\d{1,2}:\d{2}$/.test(s[field]))?.[field] || "—"; }
@@ -227,7 +238,7 @@ export default function TrainDashboard() {
   }, []);
   useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(id); }, []);
 
-  const { date: todayDate, day: todayDay } = todayInfo();
+  const { date: todayDate, day: todayDay } = todayInfo(now);
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);
   const todaysTrainInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW" || i.status === "DEPARTS TODAY" || i.status === "COMPLETED"), [allInstances]);

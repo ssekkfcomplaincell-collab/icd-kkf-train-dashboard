@@ -31,9 +31,12 @@ function todayInfo(now = new Date()) {
   }).formatToParts(now);
   const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
   const weekday = get("weekday") as Weekday;
+<<<<<<< HEAD
   // Always calculate the date from the current India (IST) clock.
   // Do not use any hard-coded/static date so the TODAY'S TRAIN box cannot
   // show an old date such as July 17 after a deployment/cache refresh.
+=======
+>>>>>>> d683bf4023cc1555f74e7ab798d8dcde8b73f826
   return {
     date: `${get("day")} ${get("month")} ${get("year")}`,
     day: WEEKDAYS.includes(weekday) ? weekday : WEEKDAYS[(now.getDay() + 6) % 7],

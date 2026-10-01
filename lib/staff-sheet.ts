@@ -156,21 +156,15 @@ async function fetchStaffForDateTab(sheetName: string, trainNo: string, departur
 
     // Google Sheets uses merged cells. Only the first physical row contains
     // TRAIN/JCO, so carry those values down until a new block starts.
-    if (explicitTrain) {
-      currentTrain = rawTrain;
-      // TRAIN is a merged block header. A new train block must start with a
-      // fresh JCO value; never inherit the previous train's JCO.
-      currentJco = explicitJco;
-    } else if (explicitJco) {
-      currentJco = explicitJco;
-    }
+    if (explicitTrain) currentTrain = rawTrain;
+    if (explicitJco) currentJco = explicitJco;
 
     if (!trainMatches(currentTrain, trainNo)) continue;
 
-    // Staff belongs to the exact service block whose JCO equals the
-    // train's ORIGINAL departure date. Do not accept a blank JCO block and
-    // do not let another train/date block leak staff into this train.
-    if (currentJco !== targetDate) continue;
+    // The date tab itself is already the service-date search key. If JCO is
+    // present, prefer the original departure-date match. If JCO is blank on
+    // a continuation row, keep using the block's inherited JCO.
+    if (currentJco && currentJco !== targetDate) continue;
 
     // OBHS: F=ID/No, G=Name, H=Contact No.
     const obhsId = nonEmpty(row[5]);
@@ -202,15 +196,39 @@ async function fetchStaffForDateTab(sheetName: string, trainNo: string, departur
 
 async function findStaffFromDepartureToToday(trainNo: string, departureDate: string): Promise<TrainStaff | null> {
   const start = normalizeDate(departureDate);
-  if (!start) return null;
+  const today = todayIndiaDate();
+  if (!start || !today) return null;
 
-  // Staff must be taken from the exact JCO/departure date supplied by the
-  // selected dashboard service instance. Do not fall back to another date:
-  // a different date can belong to a different ACCA/OBHS duty allocation.
-  // The Staff sheet currently shows TRAIN 12947 with JCO 30.09.26, so when
-  // the dashboard service instance has departure date 30.09.26, read 12947
-  // from the 30.09.26 tab only.
-  return fetchStaffForDateTab(dateTabName(start), trainNo, start);
+  // Build every date from ORIGINAL departure through today. Requests are made
+  // in parallel so a few missing/non-existent tabs cannot make the Vercel API
+  // time out while waiting for each sheet one-by-one.
+  const dates: string[] = [];
+  let cursor = start;
+  for (let guard = 0; guard <= 370; guard++) {
+    dates.push(cursor);
+    if (cursor === today) break;
+    const next = shiftDate(cursor, 1);
+    if (!next || next === cursor) break;
+    cursor = next;
+  }
+
+  const results = await Promise.allSettled(
+    dates.map((date) => fetchStaffForDateTab(dateTabName(date), trainNo, start))
+  );
+
+  const matches = results
+    .filter((r): r is PromiseFulfilledResult<TrainStaff | null> => r.status === "fulfilled")
+    .map((r) => r.value)
+    .filter((r): r is TrainStaff => Boolean(r));
+
+  if (!matches.length) return null;
+
+  return {
+    trainNo: normalizeTrainNo(trainNo),
+    departureDate: start,
+    obhs: uniqueMembers(matches.flatMap((item) => item.obhs)),
+    acca: uniqueMembers(matches.flatMap((item) => item.acca)),
+  };
 }
 
 export async function getTrainStaff(trainNo: string, departureDateIso: string): Promise<TrainStaff | null> {

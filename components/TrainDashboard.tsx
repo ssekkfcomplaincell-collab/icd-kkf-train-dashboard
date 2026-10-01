@@ -21,9 +21,23 @@ type ServiceInstance = {
   percent: number;
 };
 
-function todayInfo() {
-  const now = new Date();
-  return { date: now.toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }), day: WEEKDAYS[(now.getDay() + 6) % 7] };
+function todayInfo(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    weekday: "long",
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
+  const weekday = get("weekday") as Weekday;
+  // Always calculate the date from the current India (IST) clock.
+  // Do not use any hard-coded/static date so the TODAY'S TRAIN box cannot
+  // show an old date such as July 17 after a deployment/cache refresh.
+  return {
+    date: `${get("day")} ${get("month")} ${get("year")}`,
+    day: WEEKDAYS.includes(weekday) ? weekday : WEEKDAYS[(now.getDay() + 6) % 7],
+  };
 }
 function wateringClass(value: string) { const v = value.toUpperCase(); if (v.includes("S/W")) return "sw"; if (v.includes("O/D")) return "od"; return ""; }
 function firstTime(stations: StationRow[], field: "arrival" | "departure") { return stations.find((s) => /^\d{1,2}:\d{2}$/.test(s[field]))?.[field] || "—"; }
@@ -227,7 +241,7 @@ export default function TrainDashboard() {
   }, []);
   useEffect(() => { const id = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(id); }, []);
 
-  const { date: todayDate, day: todayDay } = todayInfo();
+  const { date: todayDate, day: todayDay } = todayInfo(now);
   const allInstances = useMemo(() => trains.flatMap((t) => activeInstances(t, now)), [trains, now]);
   const runningNowInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW"), [allInstances]);
   const todaysTrainInstances = useMemo(() => allInstances.filter((i) => i.status === "RUNNING NOW" || i.status === "DEPARTS TODAY" || i.status === "COMPLETED"), [allInstances]);
@@ -520,13 +534,13 @@ export default function TrainDashboard() {
           {!showTodayTrainList ? (
             <button className="today-train-collapsed" onClick={() => setShowTodayTrainList(true)} aria-expanded="false">
               <span className="today-train-icon">📅</span>
-              <span><b>TODAY&apos;S TRAIN</b><small>{todayDate} • {todaysTrainInstances.length} trains</small></span>
+              <span><b>TODAY&apos;S TRAIN</b><small>{todayDate} (IST) • {todaysTrainInstances.length} trains</small></span>
               <span className="today-train-chevron">▾</span>
             </button>
           ) : (
             <>
               <div className="today-train-head">
-                <div><b>TODAY&apos;S TRAIN</b><small>{todayDate} • {todaysTrainInstances.length} trains</small></div>
+                <div><b>TODAY&apos;S TRAIN</b><small>{todayDate} (IST) • {todaysTrainInstances.length} trains</small></div>
                 <button onClick={() => setShowTodayTrainList(false)} title="Close today train list">×</button>
               </div>
               <div className="today-train-list">

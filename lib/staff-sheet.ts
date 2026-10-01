@@ -202,45 +202,15 @@ async function fetchStaffForDateTab(sheetName: string, trainNo: string, departur
 
 async function findStaffFromDepartureToToday(trainNo: string, departureDate: string): Promise<TrainStaff | null> {
   const start = normalizeDate(departureDate);
-  const today = todayIndiaDate();
-  if (!start || !today) return null;
+  if (!start) return null;
 
-  // Build every date from ORIGINAL departure through today. Requests are made
-  // in parallel so a few missing/non-existent tabs cannot make the Vercel API
-  // time out while waiting for each sheet one-by-one.
-  const dates: string[] = [];
-  let cursor = start;
-  for (let guard = 0; guard <= 370; guard++) {
-    dates.push(cursor);
-    if (cursor === today) break;
-    const next = shiftDate(cursor, 1);
-    if (!next || next === cursor) break;
-    cursor = next;
-  }
-
-  const results = await Promise.allSettled(
-    dates.map((date) => fetchStaffForDateTab(dateTabName(date), trainNo, start))
-  );
-
-  const matches = results
-    .filter((r): r is PromiseFulfilledResult<TrainStaff | null> => r.status === "fulfilled")
-    .map((r) => r.value)
-    .filter((r): r is TrainStaff => Boolean(r));
-
-  if (!matches.length) return null;
-
-  // IMPORTANT: one running train instance must use ONE service's staff.
-  // Prefer the original departure-date tab; only fall back to a later tab if
-  // the original-date tab has no matching staff block. Never merge staff from
-  // multiple dates, otherwise ACCA/OBHS from another day's service can appear
-  // on the selected train.
-  const preferred = matches.find((item) => item.departureDate === start) || matches[0];
-  return {
-    trainNo: normalizeTrainNo(trainNo),
-    departureDate: start,
-    obhs: uniqueMembers(preferred.obhs),
-    acca: uniqueMembers(preferred.acca),
-  };
+  // Staff must be taken from the exact JCO/departure date supplied by the
+  // selected dashboard service instance. Do not fall back to another date:
+  // a different date can belong to a different ACCA/OBHS duty allocation.
+  // The Staff sheet currently shows TRAIN 12947 with JCO 30.09.26, so when
+  // the dashboard service instance has departure date 30.09.26, read 12947
+  // from the 30.09.26 tab only.
+  return fetchStaffForDateTab(dateTabName(start), trainNo, start);
 }
 
 export async function getTrainStaff(trainNo: string, departureDateIso: string): Promise<TrainStaff | null> {

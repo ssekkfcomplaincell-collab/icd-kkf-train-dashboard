@@ -31,12 +31,6 @@ function todayInfo(now = new Date()) {
   }).formatToParts(now);
   const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
   const weekday = get("weekday") as Weekday;
-<<<<<<< HEAD
-  // Always calculate the date from the current India (IST) clock.
-  // Do not use any hard-coded/static date so the TODAY'S TRAIN box cannot
-  // show an old date such as July 17 after a deployment/cache refresh.
-=======
->>>>>>> d683bf4023cc1555f74e7ab798d8dcde8b73f826
   return {
     date: `${get("day")} ${get("month")} ${get("year")}`,
     day: WEEKDAYS.includes(weekday) ? weekday : WEEKDAYS[(now.getDay() + 6) % 7],
@@ -537,13 +531,13 @@ export default function TrainDashboard() {
           {!showTodayTrainList ? (
             <button className="today-train-collapsed" onClick={() => setShowTodayTrainList(true)} aria-expanded="false">
               <span className="today-train-icon">📅</span>
-              <span><b>TODAY&apos;S TRAIN</b><small>{todayDate} (IST) • {todaysTrainInstances.length} trains</small></span>
+              <span><b>TODAY&apos;S TRAIN</b><small>{todayDate} • {todaysTrainInstances.length} trains</small></span>
               <span className="today-train-chevron">▾</span>
             </button>
           ) : (
             <>
               <div className="today-train-head">
-                <div><b>TODAY&apos;S TRAIN</b><small>{todayDate} (IST) • {todaysTrainInstances.length} trains</small></div>
+                <div><b>TODAY&apos;S TRAIN</b><small>{todayDate} • {todaysTrainInstances.length} trains</small></div>
                 <button onClick={() => setShowTodayTrainList(false)} title="Close today train list">×</button>
               </div>
               <div className="today-train-list">
